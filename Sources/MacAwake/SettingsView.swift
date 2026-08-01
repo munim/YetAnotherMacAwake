@@ -11,6 +11,9 @@ struct SettingsView: View {
     @AppStorage(SettingsKey.pulseKey) private var pulseKeyRaw = PulseKey.f20.rawValue
     @AppStorage(SettingsKey.launchAtLogin) private var launchAtLogin = false
     @State private var syncingLaunchAtLogin = false
+    @State private var selectedDays: Set<Int> = []
+    @State private var templateStart = Date()
+    @State private var templateEnd = Date()
 
     var body: some View {
         TabView {
@@ -46,60 +49,127 @@ struct SettingsView: View {
     // MARK: - Schedule
 
     private var scheduleTab: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 12) {
             Text("Awake follows the enabled windows for each day.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
-            List {
-                ForEach(Array(ScheduleStore.dayNames.enumerated()), id: \.offset) { index, name in
-                    dayRow(index: index, name: name)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(selectedDays.isEmpty ? "Select at least one day." : "Set the time window for the selected days:")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                HStack(spacing: 8) {
+                    DatePicker("", selection: templateStartBinding, displayedComponents: .hourAndMinute)
+                        .labelsHidden()
+                    Text("–")
+                    DatePicker("", selection: templateEndBinding, displayedComponents: .hourAndMinute)
+                        .labelsHidden()
+                    Spacer()
+                    Text(selectedDays.isEmpty ? "" : "\(selectedDays.count) selected")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
             }
-        }
-        .padding()
-    }
+            .disabled(selectedDays.isEmpty)
 
-    private func dayRow(index: Int, name: String) -> some View {
-        HStack(spacing: 8) {
-            Toggle("", isOn: enabledBinding(index))
-                .labelsHidden()
-            Text(name)
-                .frame(width: 80, alignment: .leading)
-            DatePicker("", selection: startBinding(index), displayedComponents: .hourAndMinute)
-                .labelsHidden()
-            Text("–")
-            DatePicker("", selection: endBinding(index), displayedComponents: .hourAndMinute)
-                .labelsHidden()
+            HStack(spacing: 8) {
+                Text("Quick select:")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                quickSelectButton("All", indices: Array(0...6))
+                quickSelectButton("Weekdays", indices: Array(0...4))
+                quickSelectButton("Weekend", indices: [5, 6])
+                quickSelectButton("Clear", indices: [])
+            }
+
+            HStack(spacing: 6) {
+                ForEach(Array(ScheduleStore.dayNames.enumerated()), id: \.offset) { index, name in
+                    dayChip(index: index, name: name)
+                }
+            }
+
             Spacer()
         }
-        .padding(.vertical, 2)
+        .padding()
+        .onAppear {
+            // Seed the edit group with enabled days so the shared template shows their window.
+            selectedDays = Set(store.days.indices.filter { store.days[$0].enabled })
+            reloadTemplate()
+        }
     }
 
-    private func enabledBinding(_ index: Int) -> Binding<Bool> {
+    /// Replace the edit group and align enabled state with it (keeps chips and selection in sync).
+    private func quickSelectButton(_ label: String, indices: [Int]) -> some View {
+        Button(label) {
+            selectedDays = Set(indices)
+            for i in store.days.indices {
+                store.days[i].enabled = selectedDays.contains(i)
+            }
+            store.save()
+            reloadTemplate()
+        }
+    }
+
+    private func dayChip(index: Int, name: String) -> some View {
+        let isOn = selectedDays.contains(index)
+        return Button {
+            if isOn {
+                selectedDays.remove(index)
+                store.days[index].enabled = false
+            } else {
+                selectedDays.insert(index)
+                store.days[index].enabled = true
+            }
+            store.save()
+            reloadTemplate()
+        } label: {
+            Text(String(name.prefix(3)))
+                .font(.caption)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(isOn ? Color.accentColor.opacity(0.18) : Color.gray.opacity(0.08))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .stroke(isOn ? Color.accentColor : Color.gray.opacity(0.35), lineWidth: 1)
+                )
+                .foregroundStyle(isOn ? Color.accentColor : Color.secondary)
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// Template times always reflect the first (earliest weekday) selected day.
+    private func reloadTemplate() {
+        guard let first = selectedDays.sorted().first else { return }
+        templateStart = Self.dateFromMinutes(store.days[first].startMinutes)
+        templateEnd = Self.dateFromMinutes(store.days[first].endMinutes)
+    }
+
+    private var templateStartBinding: Binding<Date> {
         Binding(
-            get: { store.days[index].enabled },
-            set: {
-                store.days[index].enabled = $0
+            get: { templateStart },
+            set: { newValue in
+                templateStart = newValue
+                let minutes = Self.minutesFromDate(newValue)
+                for index in selectedDays {
+                    store.days[index].startMinutes = minutes
+                }
                 store.save()
             }
         )
     }
 
-    private func startBinding(_ index: Int) -> Binding<Date> {
+    private var templateEndBinding: Binding<Date> {
         Binding(
-            get: { Self.dateFromMinutes(store.days[index].startMinutes) },
-            set: {
-                store.days[index].startMinutes = Self.minutesFromDate($0)
-                store.save()
-            }
-        )
-    }
-
-    private func endBinding(_ index: Int) -> Binding<Date> {
-        Binding(
-            get: { Self.dateFromMinutes(store.days[index].endMinutes) },
-            set: {
-                store.days[index].endMinutes = Self.minutesFromDate($0)
+            get: { templateEnd },
+            set: { newValue in
+                templateEnd = newValue
+                let minutes = Self.minutesFromDate(newValue)
+                for index in selectedDays {
+                    store.days[index].endMinutes = minutes
+                }
                 store.save()
             }
         )
