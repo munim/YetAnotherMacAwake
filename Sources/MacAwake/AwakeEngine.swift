@@ -154,9 +154,12 @@ final class AwakeEngine {
             NSLog("MacAwake pulse: mouse jiggle")
         case .auto:
             if AccessibilityMonitor.shared.isTrusted {
-                pressPulseKey()
-                jiggleMouse()
-                NSLog("MacAwake pulse: key + jiggle")
+                if pressPulseKey() {
+                    NSLog("MacAwake pulse: silent key")
+                } else {
+                    jiggleMouse()
+                    NSLog("MacAwake pulse: mouse jiggle (silent key set to none)")
+                }
             } else {
                 jiggleMouse()
                 NSLog("MacAwake pulse: mouse jiggle (grant accessibility for silent key)")
@@ -166,10 +169,12 @@ final class AwakeEngine {
 
     /// Press the configured inert key (F20 by default). No app maps it, so
     /// it resets idle time without visible side effects.
-    private func pressPulseKey() {
+    @discardableResult
+    private func pressPulseKey() -> Bool {
         let raw = defaults.integer(forKey: SettingsKey.pulseKey)
-        guard let key = PulseKey(rawValue: raw), key != .none else { return }
+        guard let key = PulseKey(rawValue: raw), key != .none else { return false }
         press(key: CGKeyCode(key.rawValue))
+        return true
     }
 
     private func press(key: CGKeyCode) {
@@ -177,20 +182,30 @@ final class AwakeEngine {
         CGEvent(keyboardEventSource: nil, virtualKey: key, keyDown: false)?.post(tap: .cghidEventTap)
     }
 
-    /// 1px relative move and back; delta fields avoid multi-monitor
-    /// coordinate conversion entirely.
-    private func jiggleMouse() {
-        jiggle(delta: 1)
-        jiggle(delta: -1)
+    /// Current cursor position in CG coordinates (origin top-left of primary
+    /// display). Real position is mandatory: posting to `.zero` teleports the
+    /// cursor when delta fields are ignored.
+    private func currentMousePosition() -> CGPoint {
+        let ns = NSEvent.mouseLocation
+        let primary = NSScreen.screens.first(where: { $0.frame.origin == .zero })
+            ?? NSScreen.screens.first
+        let height = primary?.frame.height ?? 0
+        return CGPoint(x: ns.x, y: height - ns.y)
     }
 
-    private func jiggle(delta: Int64) {
-        guard let event = CGEvent(
+    /// Absolute 1px move out and back. No delta fields: the position field is
+    /// always a real location, so the cursor can never be teleported.
+    private func jiggleMouse() {
+        let base = currentMousePosition()
+        postMouseMove(to: CGPoint(x: base.x + 1, y: base.y))
+        postMouseMove(to: base)
+    }
+
+    private func postMouseMove(to point: CGPoint) {
+        CGEvent(
             mouseEventSource: nil, mouseType: .mouseMoved,
-            mouseCursorPosition: .zero, mouseButton: .left
-        ) else { return }
-        event.setIntegerValueField(.mouseEventDeltaX, value: delta)
-        event.post(tap: .cghidEventTap)
+            mouseCursorPosition: point, mouseButton: .left
+        )?.post(tap: .cghidEventTap)
     }
 
     private func isOnACPower() -> Bool {
