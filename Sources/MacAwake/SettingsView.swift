@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @ObservedObject private var store = ScheduleStore.shared
+    @ObservedObject private var ax = AccessibilityMonitor.shared
     @AppStorage(SettingsKey.onlyOnAC) private var onlyOnAC = false
     @AppStorage(SettingsKey.teamsOnly) private var teamsOnly = true
     @AppStorage(SettingsKey.pulseMethod) private var pulseMethodRaw = PulseMethod.auto.rawValue
@@ -12,6 +13,8 @@ struct SettingsView: View {
                 .tabItem { Label("Schedule", systemImage: "calendar") }
             behaviorTab
                 .tabItem { Label("Behavior", systemImage: "gearshape") }
+            permissionsTab
+                .tabItem { Label("Permissions", systemImage: "lock.shield") }
         }
         .frame(width: 520, height: 400)
         .onAppear {
@@ -105,6 +108,31 @@ struct SettingsView: View {
             Section("About") {
                 LabeledContent("Version", value: "1.0")
                 LabeledContent("Purpose", value: "Keep the screen awake and stay Available in Teams")
+            }
+        }
+        .formStyle(.grouped)
+    }
+
+    // MARK: - Permissions
+
+    private var permissionsTab: some View {
+        Form {
+            Section("Accessibility") {
+                HStack(spacing: 8) {
+                    Image(systemName: ax.isTrusted ? "checkmark.seal.fill" : "exclamationmark.triangle.fill")
+                        .foregroundStyle(ax.isTrusted ? .green : .orange)
+                    Text(ax.isTrusted
+                         ? "Granted — MacAwake can send silent keep-awake key events."
+                         : "Not granted — keep-awake falls back to a subtle mouse jiggle.")
+                }
+                if !ax.isTrusted {
+                    Button("Grant Permission…") {
+                        ax.requestAccess()
+                    }
+                    Text("Opens System Settings > Privacy & Security > Accessibility. Enable MacAwake there, the status updates live.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
         .formStyle(.grouped)
