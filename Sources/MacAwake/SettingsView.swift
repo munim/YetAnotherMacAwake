@@ -7,6 +7,7 @@ struct SettingsView: View {
     @AppStorage(SettingsKey.onlyOnAC) private var onlyOnAC = false
     @AppStorage(SettingsKey.teamsOnly) private var teamsOnly = true
     @AppStorage(SettingsKey.pulseMethod) private var pulseMethodRaw = PulseMethod.auto.rawValue
+    @AppStorage(SettingsKey.pulseIntervalSeconds) private var pulseInterval = 120
     @AppStorage(SettingsKey.launchAtLogin) private var launchAtLogin = false
     @State private var syncingLaunchAtLogin = false
 
@@ -114,7 +115,13 @@ struct SettingsView: View {
                         Text(method.label).tag(method.rawValue)
                     }
                 }
-                Text("A pulse every 4 minutes keeps Teams Available.")
+                Stepper(value: $pulseInterval, in: 30...600, step: 30) {
+                    Text("Send activity every \(pulseInterval) seconds")
+                }
+                .onChange(of: pulseInterval) { _, _ in
+                    AppState.shared.evaluate()
+                }
+                Text("Shorter keeps Teams Available more reliably. Default 120 s; 240 s matches Teams' ~5-minute Away threshold.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

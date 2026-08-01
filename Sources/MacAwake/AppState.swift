@@ -24,6 +24,8 @@ final class AppState: ObservableObject {
     /// Recompute engine state from current mode + schedule.
     func evaluate() {
         engine.setActive(store.activeNow(now: Date()))
+        let interval = UserDefaults.standard.integer(forKey: SettingsKey.pulseIntervalSeconds)
+        engine.setPulseInterval(interval == 0 ? 120 : interval)
         now = Date()
     }
 

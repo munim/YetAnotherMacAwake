@@ -20,6 +20,7 @@ enum SettingsKey {
     static let onlyOnAC = "settings.onlyOnAC"
     static let teamsOnly = "settings.teamsOnly"
     static let pulseMethod = "settings.pulseMethod"
+    static let pulseIntervalSeconds = "settings.pulseIntervalSeconds"
     static let launchAtLogin = "settings.launchAtLogin"
 }
 
@@ -34,16 +35,15 @@ final class AwakeEngine {
     private var active = false
     private let defaults = UserDefaults.standard
 
-    private static let pulseInterval: TimeInterval = 240
+    private var pulseTimer: Timer?
+    private var pulseIntervalSeconds: TimeInterval = 240
 
     private init() {
-        Timer.scheduledTimer(withTimeInterval: Self.pulseInterval, repeats: true) { [weak self] _ in
-            self?.pulse()
-        }
         // Poll power state; the old NSWorkspace power notification no longer exists.
         Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
             self?.recheck()
         }
+        schedulePulseTimer()
     }
 
     var isActive: Bool { active }
@@ -52,6 +52,25 @@ final class AwakeEngine {
         guard value != active else { return }
         active = value
         recheck()
+        if value {
+            pulse()
+        }
+    }
+
+    /// Reschedule the keep-awake pulse; fires one pulse immediately.
+    func setPulseInterval(_ seconds: Int) {
+        let clamped = Double(Swift.min(600, Swift.max(30, seconds)))
+        guard clamped != pulseIntervalSeconds else { return }
+        pulseIntervalSeconds = clamped
+        schedulePulseTimer()
+        pulse()
+    }
+
+    private func schedulePulseTimer() {
+        pulseTimer?.invalidate()
+        pulseTimer = Timer.scheduledTimer(withTimeInterval: pulseIntervalSeconds, repeats: true) { [weak self] _ in
+            self?.pulse()
+        }
     }
 
     /// Power state and AC-only rule may change anytime; assertions follow.
@@ -95,17 +114,22 @@ final class AwakeEngine {
         recheck()
         guard active else { return }
         if defaults.bool(forKey: SettingsKey.teamsOnly) && !TeamsDetection.isTeamsRunning() {
+            NSLog("MacAwake pulse skipped: Teams not running")
             return
         }
         let method = PulseMethod(rawValue: defaults.string(forKey: SettingsKey.pulseMethod) ?? "") ?? .auto
         switch method {
         case .jiggle:
             jiggleMouse()
+            NSLog("MacAwake pulse: mouse jiggle")
         case .auto:
             if AccessibilityMonitor.shared.isTrusted {
                 pressF15()
+                jiggleMouse()
+                NSLog("MacAwake pulse: F15 + jiggle")
             } else {
                 jiggleMouse()
+                NSLog("MacAwake pulse: mouse jiggle (grant accessibility for silent F15)")
             }
         }
     }

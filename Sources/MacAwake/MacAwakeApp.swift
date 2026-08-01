@@ -57,6 +57,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             SettingsKey.teamsOnly: true,
             SettingsKey.onlyOnAC: false,
             SettingsKey.pulseMethod: PulseMethod.auto.rawValue,
+            SettingsKey.pulseIntervalSeconds: 120,
         ])
         NSApp.setActivationPolicy(.accessory)
         AppState.shared.start()
