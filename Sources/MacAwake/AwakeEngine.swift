@@ -52,6 +52,7 @@ enum SettingsKey {
     static let pulseIntervalSeconds = "settings.pulseIntervalSeconds"
     static let pulseKey = "settings.pulseKey"
     static let launchAtLogin = "settings.launchAtLogin"
+    static let allowDisplaySleep = "settings.allowDisplaySleep"
 }
 
 /// Holds power assertions while active and periodically sends synthetic
@@ -62,6 +63,9 @@ final class AwakeEngine {
     private var displayAssertion: IOPMAssertionID = 0
     private var systemAssertion: IOPMAssertionID = 0
     private var holding = false
+    /// Screen-off mode swaps which assertion types are held; remembered so a
+    /// settings change while holding can re-assert with the new types.
+    private var heldScreenOff = false
     private var active = false
     private let defaults = UserDefaults.standard
 
@@ -104,9 +108,14 @@ final class AwakeEngine {
     }
 
     /// Power state and AC-only rule may change anytime; assertions follow.
-    private func recheck() {
+    /// Exposed so the UI can force an immediate refresh on settings changes.
+    func recheck() {
         let want = active && shouldHoldAssertions()
+        let screenOff = defaults.bool(forKey: SettingsKey.allowDisplaySleep)
         if want && !holding {
+            holdAssertions()
+        } else if want && holding && screenOff != heldScreenOff {
+            releaseAssertions()
             holdAssertions()
         } else if !want && holding {
             releaseAssertions()
@@ -123,8 +132,18 @@ final class AwakeEngine {
     private func holdAssertions() {
         let name = "MacAwake" as CFString
         let level = IOPMAssertionLevel(kIOPMAssertionLevelOn)
-        IOPMAssertionCreateWithName(kIOPMAssertionTypePreventUserIdleDisplaySleep as CFString, level, name, &displayAssertion)
-        IOPMAssertionCreateWithName(kIOPMAssertionTypePreventUserIdleSystemSleep as CFString, level, name, &systemAssertion)
+        heldScreenOff = defaults.bool(forKey: SettingsKey.allowDisplaySleep)
+        // Screen-off mode lets the display sleep on its normal timer, so no
+        // display assertion is held. The system assertion becomes
+        // PreventSystemSleep (what `caffeinate -s` uses): it survives a closed
+        // lid while on AC power, and battery power ignores it.
+        if !heldScreenOff {
+            IOPMAssertionCreateWithName(kIOPMAssertionTypePreventUserIdleDisplaySleep as CFString, level, name, &displayAssertion)
+        }
+        let systemType = heldScreenOff
+            ? kIOPMAssertionTypePreventSystemSleep
+            : kIOPMAssertionTypePreventUserIdleSystemSleep
+        IOPMAssertionCreateWithName(systemType as CFString, level, name, &systemAssertion)
         holding = true
     }
 
@@ -143,6 +162,12 @@ final class AwakeEngine {
     func pulse() {
         recheck()
         guard active else { return }
+        // Fake activity resets the idle timer and would keep the display from
+        // ever sleeping, so screen-off mode pauses the pulse entirely.
+        if defaults.bool(forKey: SettingsKey.allowDisplaySleep) {
+            NSLog("MacAwake pulse skipped: screen off mode")
+            return
+        }
         if defaults.bool(forKey: SettingsKey.teamsOnly) && !TeamsDetection.isTeamsRunning() {
             NSLog("MacAwake pulse skipped: Teams not running")
             return

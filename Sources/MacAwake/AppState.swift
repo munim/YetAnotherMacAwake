@@ -26,6 +26,9 @@ final class AppState: ObservableObject {
         engine.setActive(store.activeNow(now: Date()))
         let interval = UserDefaults.standard.integer(forKey: SettingsKey.pulseIntervalSeconds)
         engine.setPulseInterval(interval == 0 ? 120 : interval)
+        // Re-check assertions so assertion-affecting settings (screen-off mode)
+        // apply immediately instead of waiting for the next 30 s poll.
+        engine.recheck()
         now = Date()
     }
 

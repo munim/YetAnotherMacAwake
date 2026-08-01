@@ -52,12 +52,12 @@ open MacAwake.app           # run the bundle
 ./.build/debug/MacAwake --selftest          # schedule logic, exit 0 = pass (15 cases)
 ./.build/debug/MacAwake --force-on          # activate without UI (for testing)
 ./.build/debug/MacAwake --pulse-now         # fire one pulse, print idle before/after, exit
-pmset -g assertions | grep -i macawake      # must show both display+system assertions while active
+pmset -g assertions | grep -i macawake      # both display+system assertions; screen-off mode shows only the system assertion
 log stream --predicate 'composedMessage CONTAINS "MacAwake"'   # live pulse logs
 ```
 
 Expected log lines: `MacAwake pulse: silent key` | `MacAwake pulse: mouse jiggle`
-| `MacAwake pulse skipped: Teams not running`.
+| `MacAwake pulse skipped: Teams not running` | `MacAwake pulse skipped: screen off mode`.
 
 ## Domain gotchas (learned the hard way — respect these)
 
@@ -87,14 +87,24 @@ Expected log lines: `MacAwake pulse: silent key` | `MacAwake pulse: mouse jiggle
   state with a 30 s `Timer` in the engine.
 - **Launch-at-login (`SMAppService.mainApp`)** only works from a bundled,
   signed `.app`. Revert-toggle to `SMAppService.mainApp.status` on failure.
-- **Lid close / manual sleep always wins** — by design, do not "fix".
+- **Lid close / manual sleep always wins** — by design, do not "fix". The one
+  exception is screen-off mode (`settings.allowDisplaySleep`): it swaps the
+  system assertion to `PreventSystemSleep` (`caffeinate -s`), which survives a
+  closed lid while on AC power. Battery power ignores the assertion, and some
+  Macs still sleep on lid-close without an external display (clamshell).
 - Pulse fires only when `settings.teamsOnly` is on AND Teams is running; the
   sleep assertion still holds regardless (screen stays awake even if pulse is
   skipped).
+- **Screen-off mode pauses the pulse.** Any fake activity (F20/jiggle) resets
+  the idle timer, which keeps the display from ever sleeping. When
+  `settings.allowDisplaySleep` is on, `pulse()` early-returns and the engine
+  holds only `PreventSystemSleep` (no display assertion).
 
 ## Persistence (UserDefaults keys)
 
-All keys are string constants in `SettingsKey` (`settings.*`) and
+All keys are string constants in `SettingsKey` (`settings.onlyOnAC`,
+`settings.teamsOnly`, `settings.pulseMethod`, `settings.pulseIntervalSeconds`,
+`settings.pulseKey`, `settings.launchAtLogin`, `settings.allowDisplaySleep`) and
 `ScheduleStore` (`schedule.mode`, `schedule.days`). `ScheduleStore` persists
 `[DaySchedule]` (7, Monday=0…Sunday=6) as JSON under `schedule.days`, mode under
 `schedule.mode`. Keep `@AppStorage` defaults and `UserDefaults.register`

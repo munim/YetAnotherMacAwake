@@ -59,6 +59,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             SettingsKey.pulseMethod: PulseMethod.auto.rawValue,
             SettingsKey.pulseIntervalSeconds: 120,
             SettingsKey.pulseKey: PulseKey.f20.rawValue,
+            SettingsKey.allowDisplaySleep: false,
         ])
         NSApp.setActivationPolicy(.accessory)
         AppState.shared.start()

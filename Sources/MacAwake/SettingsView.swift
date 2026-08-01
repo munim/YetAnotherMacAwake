@@ -10,6 +10,7 @@ struct SettingsView: View {
     @AppStorage(SettingsKey.pulseIntervalSeconds) private var pulseInterval = 120
     @AppStorage(SettingsKey.pulseKey) private var pulseKeyRaw = PulseKey.f20.rawValue
     @AppStorage(SettingsKey.launchAtLogin) private var launchAtLogin = false
+    @AppStorage(SettingsKey.allowDisplaySleep) private var allowDisplaySleep = false
     @State private var syncingLaunchAtLogin = false
     @State private var selectedDays: Set<Int> = []
     @State private var templateStart = Date()
@@ -266,6 +267,13 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
             Section("Sleep prevention") {
+                Toggle("Allow display to sleep while awake", isOn: $allowDisplaySleep)
+                    .onChange(of: allowDisplaySleep) { _, _ in
+                        AppState.shared.evaluate()
+                    }
+                Text("The display sleeps on its normal timer while the system keeps running — even with the lid closed. Requires AC power (battery ignores the system assertion); the Teams activity pulse pauses so the screen can turn off.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 Toggle("Prevent sleep only on AC power", isOn: $onlyOnAC)
                 Text("On battery the display may sleep and Teams may go Away.")
                     .font(.caption)
