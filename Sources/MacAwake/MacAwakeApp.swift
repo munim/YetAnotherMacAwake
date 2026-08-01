@@ -58,6 +58,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if CommandLine.arguments.contains("--force-on") {
             AppState.shared.engine.setActive(true)
         }
+        if CommandLine.arguments.contains("--pulse-now") {
+            let idleBefore = Self.idleSeconds()
+            AppState.shared.engine.pulse()
+            Thread.sleep(forTimeInterval: 1.5)
+            print("idle-before: \(idleBefore)s  idle-after: \(Self.idleSeconds())s")
+            exit(0)
+        }
+    }
+
+    private static func idleSeconds() -> CFTimeInterval {
+        let anyInput = CGEventType(rawValue: UInt32(0xFFFFFFFF)) ?? .mouseMoved
+        return CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: anyInput)
     }
 
     /// CLI self-test for schedule logic (no XCTest in Command Line Tools).

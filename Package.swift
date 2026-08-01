@@ -8,3 +8,4 @@ let package = Package(
         .executableTarget(name: "MacAwake", path: "Sources/MacAwake")
     ]
 )
+
