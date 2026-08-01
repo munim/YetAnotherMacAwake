@@ -12,6 +12,10 @@ struct MacAwakeApp: App {
             Image(systemName: state.menuIconName)
         }
         .menuBarExtraStyle(.menu)
+
+        Settings {
+            SettingsView()
+        }
     }
 }
 
@@ -32,6 +36,10 @@ struct MenuContentView: View {
         Button { state.setMode(.scheduled) } label: {
             Label("Follow Schedule", systemImage: state.store.mode == .scheduled ? "checkmark" : "")
         }
+
+        Divider()
+
+        SettingsLink { Text("Settings…") }
 
         Divider()
 
