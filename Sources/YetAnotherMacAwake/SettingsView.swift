@@ -294,7 +294,7 @@ struct SettingsView: View {
             Image(systemName: "flame.fill")
                 .font(.system(size: 56))
                 .foregroundStyle(.orange)
-            Text("MacAwake")
+            Text("Yet Another Mac Awake")
                 .font(.title2)
                 .fontWeight(.semibold)
             Text("Version \(version)")
@@ -336,14 +336,14 @@ struct SettingsView: View {
                     Image(systemName: ax.isTrusted ? "checkmark.seal.fill" : "exclamationmark.triangle.fill")
                         .foregroundStyle(ax.isTrusted ? .green : .orange)
                     Text(ax.isTrusted
-                         ? "Granted — MacAwake can send silent keep-awake key events."
+                         ? "Granted — Yet Another Mac Awake can send silent keep-awake key events."
                          : "Not granted — keep-awake falls back to a subtle mouse jiggle.")
                 }
                 if !ax.isTrusted {
                     Button("Grant Permission…") {
                         ax.requestAccess()
                     }
-                    Text("Opens System Settings > Privacy & Security > Accessibility. Enable MacAwake there, the status updates live.")
+                    Text("Opens System Settings > Privacy & Security > Accessibility. Enable Yet Another Mac Awake there, the status updates live.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

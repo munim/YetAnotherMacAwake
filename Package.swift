@@ -2,10 +2,10 @@
 import PackageDescription
 
 let package = Package(
-    name: "MacAwake",
+    name: "YetAnotherMacAwake",
     platforms: [.macOS(.v14)],
     targets: [
-        .executableTarget(name: "MacAwake", path: "Sources/MacAwake")
+        .executableTarget(name: "YetAnotherMacAwake", path: "Sources/YetAnotherMacAwake")
     ]
 )
 

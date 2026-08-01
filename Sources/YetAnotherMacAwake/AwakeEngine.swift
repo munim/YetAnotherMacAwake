@@ -130,7 +130,7 @@ final class AwakeEngine {
     }
 
     private func holdAssertions() {
-        let name = "MacAwake" as CFString
+        let name = "YetAnotherMacAwake" as CFString
         let level = IOPMAssertionLevel(kIOPMAssertionLevelOn)
         heldScreenOff = defaults.bool(forKey: SettingsKey.allowDisplaySleep)
         // Screen-off mode lets the display sleep on its normal timer, so no
@@ -165,29 +165,29 @@ final class AwakeEngine {
         // Fake activity resets the idle timer and would keep the display from
         // ever sleeping, so screen-off mode pauses the pulse entirely.
         if defaults.bool(forKey: SettingsKey.allowDisplaySleep) {
-            NSLog("MacAwake pulse skipped: screen off mode")
+            NSLog("YetAnotherMacAwake pulse skipped: screen off mode")
             return
         }
         if defaults.bool(forKey: SettingsKey.teamsOnly) && !TeamsDetection.isTeamsRunning() {
-            NSLog("MacAwake pulse skipped: Teams not running")
+            NSLog("YetAnotherMacAwake pulse skipped: Teams not running")
             return
         }
         let method = PulseMethod(rawValue: defaults.string(forKey: SettingsKey.pulseMethod) ?? "") ?? .auto
         switch method {
         case .jiggle:
             jiggleMouse()
-            NSLog("MacAwake pulse: mouse jiggle")
+            NSLog("YetAnotherMacAwake pulse: mouse jiggle")
         case .auto:
             if AccessibilityMonitor.shared.isTrusted {
                 if pressPulseKey() {
-                    NSLog("MacAwake pulse: silent key")
+                    NSLog("YetAnotherMacAwake pulse: silent key")
                 } else {
                     jiggleMouse()
-                    NSLog("MacAwake pulse: mouse jiggle (silent key set to none)")
+                    NSLog("YetAnotherMacAwake pulse: mouse jiggle (silent key set to none)")
                 }
             } else {
                 jiggleMouse()
-                NSLog("MacAwake pulse: mouse jiggle (grant accessibility for silent key)")
+                NSLog("YetAnotherMacAwake pulse: mouse jiggle (grant accessibility for silent key)")
             }
         }
     }

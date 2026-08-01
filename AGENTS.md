@@ -2,7 +2,7 @@
 
 ## What this is
 
-MacAwake — a macOS menu bar app (SwiftUI `MenuBarExtra`, macOS 14+) that keeps the
+YetAnotherMacAwake (display: "Yet Another Mac Awake") — a macOS menu bar app (SwiftUI `MenuBarExtra`, macOS 14+) that keeps the
 screen awake and keeps you **Available in Microsoft Teams** during configurable
 per-day windows.
 
@@ -22,9 +22,9 @@ Load skills before coding:
 ```
 Package.swift                          # SPM, macOS 14+, no deps
 Info.plist                             # LSUIElement=true (menu bar only)
-build.sh                               # release build → MacAwake.app + ad-hoc codesign
-Sources/MacAwake/
-├── MacAwakeApp.swift                  # @main, MenuBarExtra menu, AppDelegate, CLI selftest
+build.sh                               # release build → YetAnotherMacAwake.app + ad-hoc codesign
+Sources/YetAnotherMacAwake/
+├── YetAnotherMacAwakeApp.swift        # @main, MenuBarExtra menu, AppDelegate, CLI selftest
 ├── AppState.swift                     # single source of truth: mode/schedule → engine (30 s poll)
 ├── AwakeEngine.swift                  # IOPM assertions + activity pulse; SettingsKey, PulseMethod, PulseKey
 ├── ScheduleStore.swift                # per-day windows, Codable → UserDefaults; Mode, DaySchedule
@@ -32,7 +32,7 @@ Sources/MacAwake/
 └── SettingsView.swift                 # Settings scene: Schedule / Behavior / Permissions tabs
 ```
 
-Layering: UI (`*View`, `MacAwakeApp`) → `AppState` → `AwakeEngine` /
+Layering: UI (`*View`, `YetAnotherMacAwakeApp`) → `AppState` → `AwakeEngine` /
 `ScheduleStore`. `ScheduleStore` and `AccessibilityMonitor` are also
 `ObservableObject`s consumed by UI. Singletons via `static let shared`.
 
@@ -41,23 +41,23 @@ Layering: UI (`*View`, `MacAwakeApp`) → `AppState` → `AwakeEngine` /
 ```bash
 swift build                 # dev build (debug)
 swift run                   # run raw binary (launch-at-login will not work; needs bundle)
-./build.sh                  # release → MacAwake.app in repo root
-open MacAwake.app           # run the bundle
-./build.sh && open MacAwake.app   # normal rebuild+run cycle
+./build.sh                        # release → YetAnotherMacAwake.app in repo root
+open YetAnotherMacAwake.app       # run the bundle
+./build.sh && open YetAnotherMacAwake.app   # normal rebuild+run cycle
 ```
 
 ### Verify (do this after each feature)
 
 ```bash
-./.build/debug/MacAwake --selftest          # schedule logic, exit 0 = pass (15 cases)
-./.build/debug/MacAwake --force-on          # activate without UI (for testing)
-./.build/debug/MacAwake --pulse-now         # fire one pulse, print idle before/after, exit
-pmset -g assertions | grep -i macawake      # both display+system assertions; screen-off mode shows only the system assertion
-log stream --predicate 'composedMessage CONTAINS "MacAwake"'   # live pulse logs
+./.build/debug/YetAnotherMacAwake --selftest          # schedule logic, exit 0 = pass (15 cases)
+./.build/debug/YetAnotherMacAwake --force-on          # activate without UI (for testing)
+./.build/debug/YetAnotherMacAwake --pulse-now         # fire one pulse, print idle before/after, exit
+pmset -g assertions | grep -i yetanothermacawake      # both display+system assertions; screen-off mode shows only the system assertion
+log stream --predicate 'composedMessage CONTAINS "YetAnotherMacAwake"'   # live pulse logs
 ```
 
-Expected log lines: `MacAwake pulse: silent key` | `MacAwake pulse: mouse jiggle`
-| `MacAwake pulse skipped: Teams not running` | `MacAwake pulse skipped: screen off mode`.
+Expected log lines: `YetAnotherMacAwake pulse: silent key` | `YetAnotherMacAwake pulse: mouse jiggle`
+| `YetAnotherMacAwake pulse skipped: Teams not running` | `YetAnotherMacAwake pulse skipped: screen off mode`.
 
 ## Domain gotchas (learned the hard way — respect these)
 
@@ -117,7 +117,7 @@ caused a real bug.
 - `final class` singletons (`static let shared`); `@Published` for UI state.
 - Enums with raw values for settings/options (`Mode`, `PulseMethod`,
   `PulseKey`) + a `label` for display.
-- `NSLog("MacAwake …")` (not `print`) for runtime diagnostics so they show in
+- `NSLog("YetAnotherMacAwake …")` (not `print`) for runtime diagnostics so they show in
   Console; `print` only for CLI/self-test output.
 - Comments explain *why* (especially around CoreGraphics/IOKit quirks), not what.
 - Use `private init()` for singletons; keep timer invalidation explicit.

@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct MacAwakeApp: App {
+struct YetAnotherMacAwakeApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var state = AppState.shared
 
@@ -43,7 +43,7 @@ struct MenuContentView: View {
 
         Divider()
 
-        Button("Quit MacAwake") { NSApp.terminate(nil) }
+        Button("Quit Yet Another Mac Awake") { NSApp.terminate(nil) }
     }
 }
 

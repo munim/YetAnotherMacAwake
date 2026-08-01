@@ -1,9 +1,9 @@
 #!/bin/bash
-# Build MacAwake.swift into a standalone .app bundle
+# Build YetAnotherMacAwake into a standalone .app bundle
 set -euo pipefail
 cd "$(dirname "$0")"
 
-APP_NAME="MacAwake"
+APP_NAME="YetAnotherMacAwake"
 APP="$APP_NAME.app"
 
 swift build -c release
