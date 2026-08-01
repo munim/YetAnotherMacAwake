@@ -7,7 +7,7 @@
 	<key>CFBundleExecutable</key>
 	<string>YetAnotherMacAwake</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.local.YetAnotherMacAwake</string>
+	<string>net.munim.YetAnotherMacAwake</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
