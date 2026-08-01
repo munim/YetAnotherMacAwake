@@ -23,6 +23,8 @@ struct SettingsView: View {
                 .tabItem { Label("Behavior", systemImage: "gearshape") }
             permissionsTab
                 .tabItem { Label("Permissions", systemImage: "lock.shield") }
+            aboutTab
+                .tabItem { Label("About", systemImage: "info.circle") }
         }
         .frame(width: 520, height: 460)
         .onAppear {
@@ -272,12 +274,49 @@ struct SettingsView: View {
             Section("Startup") {
                 Toggle("Launch at login", isOn: $launchAtLogin)
             }
-            Section("About") {
-                LabeledContent("Version", value: "1.0")
-                LabeledContent("Purpose", value: "Keep the screen awake and stay Available in Teams")
-            }
         }
         .formStyle(.grouped)
+    }
+
+    // MARK: - About
+
+    private var aboutTab: some View {
+        VStack(spacing: 14) {
+            Spacer()
+            Image(systemName: "flame.fill")
+                .font(.system(size: 56))
+                .foregroundStyle(.orange)
+            Text("MacAwake")
+                .font(.title2)
+                .fontWeight(.semibold)
+            Text("Version \(version)")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text("Keeps the screen awake — even during long coding-agent runs — and keeps you Available in Microsoft Teams during your scheduled windows.")
+                .multilineTextAlignment(.center)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: 380)
+            VStack(spacing: 6) {
+                HStack(spacing: 6) {
+                    Text("Author:")
+                        .foregroundStyle(.secondary)
+                    Text("Abdul Munim")
+                }
+                Link("www.munim.net", destination: URL(string: "https://www.munim.net/")!)
+                Link("x.com/munim", destination: URL(string: "https://x.com/munim")!)
+            }
+            .font(.callout)
+            Spacer()
+            Text("Requires macOS 14 or later")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding()
+    }
+
+    /// Bundle version, with a fallback for `swift run` (no Info.plist in the raw binary).
+    private var version: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0"
     }
 
     // MARK: - Permissions
