@@ -65,12 +65,16 @@ struct SettingsView: View {
                     DatePicker("", selection: templateEndBinding, displayedComponents: .hourAndMinute)
                         .labelsHidden()
                     Spacer()
-                    Text(selectedDays.isEmpty ? "" : "\(selectedDays.count) selected")
+                    Text(selectedDays.isEmpty ? "no days" : "\(selectedDays.count) selected")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
             }
-            .disabled(selectedDays.isEmpty)
+            // Dim + block hits instead of `.disabled`: toggling `isEnabled` on
+            // DatePicker (NSViewRepresentable) re-enters layout and trips
+            // "AttributeGraph: cycle detected" in SwiftUI.
+            .opacity(selectedDays.isEmpty ? 0.5 : 1)
+            .allowsHitTesting(!selectedDays.isEmpty)
 
             HStack(spacing: 8) {
                 Text("Quick select:")
