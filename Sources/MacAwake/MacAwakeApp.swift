@@ -52,6 +52,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if CommandLine.arguments.contains("--selftest") {
             exit(Self.runSelfTest() ? 0 : 1)
         }
+        // Keep @AppStorage defaults and plain UserDefaults reads in sync.
+        UserDefaults.standard.register(defaults: [
+            SettingsKey.teamsOnly: true,
+            SettingsKey.onlyOnAC: false,
+            SettingsKey.pulseMethod: PulseMethod.auto.rawValue,
+        ])
         NSApp.setActivationPolicy(.accessory)
         AppState.shared.start()
         AccessibilityMonitor.shared.start()
