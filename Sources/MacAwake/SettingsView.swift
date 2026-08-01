@@ -24,7 +24,7 @@ struct SettingsView: View {
             permissionsTab
                 .tabItem { Label("Permissions", systemImage: "lock.shield") }
         }
-        .frame(width: 520, height: 400)
+        .frame(width: 520, height: 460)
         .onAppear {
             NSApp.activate()
             syncingLaunchAtLogin = true
@@ -85,6 +85,19 @@ struct SettingsView: View {
             HStack(spacing: 6) {
                 ForEach(Array(ScheduleStore.dayNames.enumerated()), id: \.offset) { index, name in
                     dayChip(index: index, name: name)
+                }
+            }
+
+            Divider()
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Individual times (optional — override the batch window per day)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                VStack(spacing: 0) {
+                    ForEach(Array(ScheduleStore.dayNames.enumerated()), id: \.offset) { index, name in
+                        dayTimeRow(index: index, name: name)
+                    }
                 }
             }
 
@@ -174,6 +187,47 @@ struct SettingsView: View {
             }
         )
     }
+    private func dayTimeRow(index: Int, name: String) -> some View {
+        let isEnabled = store.days[index].enabled
+        return HStack(spacing: 8) {
+            Text(name)
+                .frame(width: 80, alignment: .leading)
+                .foregroundStyle(isEnabled ? .primary : .secondary)
+            DatePicker("", selection: perDayStartBinding(index), displayedComponents: .hourAndMinute)
+                .labelsHidden()
+            Text("–")
+                .foregroundStyle(isEnabled ? .primary : .secondary)
+            DatePicker("", selection: perDayEndBinding(index), displayedComponents: .hourAndMinute)
+                .labelsHidden()
+            Spacer()
+            Image(systemName: isEnabled ? "checkmark.circle.fill" : "circle")
+                .foregroundStyle(isEnabled ? Color.green : Color.secondary.opacity(0.4))
+        }
+        .padding(.vertical, 2)
+    }
+
+    /// Per-day overrides: editing writes only to this day, so days can differ from the batch window.
+    private func perDayStartBinding(_ index: Int) -> Binding<Date> {
+        Binding(
+            get: { Self.dateFromMinutes(store.days[index].startMinutes) },
+            set: {
+                store.days[index].startMinutes = Self.minutesFromDate($0)
+                store.save()
+            }
+        )
+    }
+
+    private func perDayEndBinding(_ index: Int) -> Binding<Date> {
+        Binding(
+            get: { Self.dateFromMinutes(store.days[index].endMinutes) },
+            set: {
+                store.days[index].endMinutes = Self.minutesFromDate($0)
+                store.save()
+            }
+        )
+    }
+
+
 
     // MARK: - Behavior
 
