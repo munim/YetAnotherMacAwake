@@ -19,5 +19,8 @@ struct MacAwakeApp: App {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
+        if CommandLine.arguments.contains("--force-on") {
+            AwakeEngine.shared.setActive(true)
+        }
     }
 }
