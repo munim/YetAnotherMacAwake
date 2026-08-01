@@ -10,8 +10,37 @@ enum PulseMethod: String, CaseIterable {
 
     var label: String {
         switch self {
-        case .auto: return "Auto (silent key, falls back to jiggle)"
+        case .auto: return "Auto (silent key when allowed, else jiggle)"
         case .jiggle: return "Always mouse jiggle"
+        }
+    }
+}
+
+/// Inert keys for the invisible activity pulse. F20 has no default action on
+/// macOS and no physical key on standard keyboards, so neither macOS nor
+/// Aerospace binds it. Any F-key can be made configurable-safe in Settings.
+enum PulseKey: Int, CaseIterable {
+    case f13 = 0x69
+    case f14 = 0x6B
+    case f15 = 0x71
+    case f16 = 0x6A
+    case f17 = 0x40
+    case f18 = 0x4F
+    case f19 = 0x50
+    case f20 = 0x5A
+    case none = -1
+
+    var label: String {
+        switch self {
+        case .f13: return "F13"
+        case .f14: return "F14"
+        case .f15: return "F15"
+        case .f16: return "F16"
+        case .f17: return "F17"
+        case .f18: return "F18"
+        case .f19: return "F19"
+        case .f20: return "F20 (recommended)"
+        case .none: return "Mouse only"
         }
     }
 }
@@ -21,6 +50,7 @@ enum SettingsKey {
     static let teamsOnly = "settings.teamsOnly"
     static let pulseMethod = "settings.pulseMethod"
     static let pulseIntervalSeconds = "settings.pulseIntervalSeconds"
+    static let pulseKey = "settings.pulseKey"
     static let launchAtLogin = "settings.launchAtLogin"
 }
 
@@ -124,19 +154,25 @@ final class AwakeEngine {
             NSLog("MacAwake pulse: mouse jiggle")
         case .auto:
             if AccessibilityMonitor.shared.isTrusted {
-                pressF15()
+                pressPulseKey()
                 jiggleMouse()
-                NSLog("MacAwake pulse: F15 + jiggle")
+                NSLog("MacAwake pulse: key + jiggle")
             } else {
                 jiggleMouse()
-                NSLog("MacAwake pulse: mouse jiggle (grant accessibility for silent F15)")
+                NSLog("MacAwake pulse: mouse jiggle (grant accessibility for silent key)")
             }
         }
     }
 
-    /// F15 has no macOS function mapped — silent, invisible reset of idle time.
-    private func pressF15() {
-        let key: CGKeyCode = 0x67 // kVK_F15
+    /// Press the configured inert key (F20 by default). No app maps it, so
+    /// it resets idle time without visible side effects.
+    private func pressPulseKey() {
+        let raw = defaults.integer(forKey: SettingsKey.pulseKey)
+        guard let key = PulseKey(rawValue: raw), key != .none else { return }
+        press(key: CGKeyCode(key.rawValue))
+    }
+
+    private func press(key: CGKeyCode) {
         CGEvent(keyboardEventSource: nil, virtualKey: key, keyDown: true)?.post(tap: .cghidEventTap)
         CGEvent(keyboardEventSource: nil, virtualKey: key, keyDown: false)?.post(tap: .cghidEventTap)
     }

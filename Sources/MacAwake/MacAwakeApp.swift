@@ -58,6 +58,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             SettingsKey.onlyOnAC: false,
             SettingsKey.pulseMethod: PulseMethod.auto.rawValue,
             SettingsKey.pulseIntervalSeconds: 120,
+            SettingsKey.pulseKey: PulseKey.f20.rawValue,
         ])
         NSApp.setActivationPolicy(.accessory)
         AppState.shared.start()

@@ -8,6 +8,7 @@ struct SettingsView: View {
     @AppStorage(SettingsKey.teamsOnly) private var teamsOnly = true
     @AppStorage(SettingsKey.pulseMethod) private var pulseMethodRaw = PulseMethod.auto.rawValue
     @AppStorage(SettingsKey.pulseIntervalSeconds) private var pulseInterval = 120
+    @AppStorage(SettingsKey.pulseKey) private var pulseKeyRaw = PulseKey.f20.rawValue
     @AppStorage(SettingsKey.launchAtLogin) private var launchAtLogin = false
     @State private var syncingLaunchAtLogin = false
 
@@ -115,6 +116,15 @@ struct SettingsView: View {
                         Text(method.label).tag(method.rawValue)
                     }
                 }
+                Picker("Silent key", selection: $pulseKeyRaw) {
+                    ForEach(PulseKey.allCases, id: \.self) { key in
+                        Text(key.label).tag(key.rawValue)
+                    }
+                }
+                .disabled(pulseMethodRaw != PulseMethod.auto.rawValue)
+                Text("Silent key is sent when accessibility is granted. F13–F19 may be bound by Aerospace or macOS — F20 has no default action on any keyboard.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 Stepper(value: $pulseInterval, in: 30...600, step: 30) {
                     Text("Send activity every \(pulseInterval) seconds")
                 }
