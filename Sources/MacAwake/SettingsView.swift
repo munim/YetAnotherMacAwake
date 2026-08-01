@@ -1,4 +1,5 @@
 import SwiftUI
+import ServiceManagement
 
 struct SettingsView: View {
     @ObservedObject private var store = ScheduleStore.shared
@@ -6,6 +7,8 @@ struct SettingsView: View {
     @AppStorage(SettingsKey.onlyOnAC) private var onlyOnAC = false
     @AppStorage(SettingsKey.teamsOnly) private var teamsOnly = true
     @AppStorage(SettingsKey.pulseMethod) private var pulseMethodRaw = PulseMethod.auto.rawValue
+    @AppStorage(SettingsKey.launchAtLogin) private var launchAtLogin = false
+    @State private var syncingLaunchAtLogin = false
 
     var body: some View {
         TabView {
@@ -19,6 +22,22 @@ struct SettingsView: View {
         .frame(width: 520, height: 400)
         .onAppear {
             NSApp.activate()
+            syncingLaunchAtLogin = true
+            launchAtLogin = SMAppService.mainApp.status == .enabled
+            syncingLaunchAtLogin = false
+        }
+        .onChange(of: launchAtLogin) { _, value in
+            guard !syncingLaunchAtLogin else { return }
+            do {
+                if value {
+                    try SMAppService.mainApp.register()
+                } else {
+                    try SMAppService.mainApp.unregister()
+                }
+            } catch {
+                // Not bundled or unsigned (e.g. `swift run`); revert to real state.
+                launchAtLogin = SMAppService.mainApp.status == .enabled
+            }
         }
     }
 
@@ -104,6 +123,9 @@ struct SettingsView: View {
                 Text("On battery the display may sleep and Teams may go Away.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            }
+            Section("Startup") {
+                Toggle("Launch at login", isOn: $launchAtLogin)
             }
             Section("About") {
                 LabeledContent("Version", value: "1.0")
