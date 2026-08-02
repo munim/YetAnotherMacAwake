@@ -48,7 +48,7 @@ enum PulseKey: Int, CaseIterable {
 
 enum SettingsKey {
     static let onlyOnAC = "settings.onlyOnAC"
-    static let teamsOnly = "settings.teamsOnly"
+    static let pulseApps = "settings.pulseApps"
     static let pulseMethod = "settings.pulseMethod"
     static let pulseIntervalSeconds = "settings.pulseIntervalSeconds"
     static let pulseKey = "settings.pulseKey"
@@ -64,8 +64,66 @@ enum AssertionProfile {
     case none, screenAndSystem, systemOnly
 }
 
+/// Known messaging apps that can gate the activity pulse. Bundle IDs were
+/// verified against the Mac App Store (Slack) and Homebrew cask definitions
+/// (Discord, Zoom); Teams carries both the classic and new client IDs.
+enum MessagingApp: String, CaseIterable {
+    case teams = "teams"
+    case slack = "slack"
+    case discord = "discord"
+    case zoom = "zoom"
+
+    var label: String {
+        switch self {
+        case .teams: return "Teams"
+        case .slack: return "Slack"
+        case .discord: return "Discord"
+        case .zoom: return "Zoom"
+        }
+    }
+
+    var bundleIDs: Set<String> {
+        switch self {
+        case .teams: return ["com.microsoft.teams", "com.microsoft.teams2"]
+        case .slack: return ["com.tinyspeck.slackmacgap"]
+        case .discord: return ["com.hnc.Discord"]
+        case .zoom: return ["us.zoom.xos"]
+        }
+    }
+}
+
+/// The pulse-app selection, persisted as a comma-delimited string of raw values
+/// so `@AppStorage` can hold it. Empty selection means no gate (always pulse).
+struct PulseAppsSelection: RawRepresentable, Equatable {
+    var apps: Set<MessagingApp> = []
+
+    init(_ apps: Set<MessagingApp> = []) { self.apps = apps }
+
+    init(rawValue: String) {
+        apps = Set(rawValue.split(separator: ",")
+            .map(String.init)
+            .compactMap(MessagingApp.init(rawValue:)))
+    }
+
+    var rawValue: String {
+        apps.map(\.rawValue).sorted().joined(separator: ",")
+    }
+
+    /// The persisted selection from a defaults domain; empty when absent or corrupt.
+    static func fromDefaults(_ defaults: UserDefaults) -> PulseAppsSelection {
+        PulseAppsSelection(rawValue: defaults.string(forKey: SettingsKey.pulseApps) ?? "")
+    }
+
+    /// The screen-off pulse-paused conflict: the display may sleep, the pulse is
+    /// app-gated (at least one app checked), and no override re-enables it.
+    /// Shared by the menu status line and the Settings warning so the two can't drift.
+    func presenceMayGoAway(screenOff: Bool, overrideEnabled: Bool) -> Bool {
+        screenOff && !apps.isEmpty && !overrideEnabled
+    }
+}
+
 /// Holds power assertions while active and periodically sends synthetic
-/// user activity so Teams never flips to Away.
+/// user activity so messaging-app presence never flips to Away.
 final class AwakeEngine {
     static let shared = AwakeEngine()
 
@@ -149,6 +207,15 @@ final class AwakeEngine {
         return allowDisplaySleep ? .systemOnly : .screenAndSystem
     }
 
+    /// Pure decision: should the pulse fire given the selected apps and the
+    /// bundle IDs currently running. Empty selection means "always pulse" (no
+    /// gate); otherwise any selected app whose bundle IDs intersect the running
+    /// set suffices (any-of matching).
+    static func pulseGate(selected: Set<MessagingApp>, runningBundleIDs: Set<String>) -> Bool {
+        guard !selected.isEmpty else { return true }
+        return selected.contains { !$0.bundleIDs.isDisjoint(with: runningBundleIDs) }
+    }
+
     private func holdAssertions(screenOff: Bool) {
         let name = "YetAnotherMacAwake" as CFString
         let level = IOPMAssertionLevel(kIOPMAssertionLevelOn)
@@ -186,14 +253,21 @@ final class AwakeEngine {
         let override = defaults.bool(forKey: SettingsKey.pulseWhenScreenOff)
         // Fake activity resets the idle timer and would keep the display from
         // ever sleeping, so screen-off mode pauses the pulse — unless the
-        // override opts back in, trading display sleep for Teams availability.
+        // override opts back in, trading display sleep for presence availability.
         if screenOff && !override {
             NSLog("YetAnotherMacAwake pulse skipped: screen off mode")
             return
         }
-        if defaults.bool(forKey: SettingsKey.teamsOnly) && !TeamsDetection.isTeamsRunning() {
-            NSLog("YetAnotherMacAwake pulse skipped: Teams not running")
-            return
+        // App gate: an empty selection pulses unconditionally; otherwise the
+        // pulse fires only while at least one selected app runs. Re-evaluated
+        // on every pulse, so launching or quitting an app applies next interval.
+        let selection = PulseAppsSelection.fromDefaults(defaults)
+        if !selection.apps.isEmpty {
+            let running = Set(NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier))
+            if !Self.pulseGate(selected: selection.apps, runningBundleIDs: running) {
+                NSLog("YetAnotherMacAwake pulse skipped: no selected messaging app running")
+                return
+            }
         }
         // The override still respects the AC-only rule: on battery with the rule
         // on the awake state is dropped entirely, so a pulse would fight it.
@@ -271,14 +345,5 @@ final class AwakeEngine {
             return true
         }
         return (source.takeRetainedValue() as String) == kIOPMACPowerKey
-    }
-}
-
-enum TeamsDetection {
-    static func isTeamsRunning() -> Bool {
-        NSWorkspace.shared.runningApplications.contains { app in
-            guard let id = app.bundleIdentifier else { return false }
-            return id == "com.microsoft.teams" || id == "com.microsoft.teams2"
-        }
     }
 }

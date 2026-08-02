@@ -3,7 +3,7 @@
 ## What this is
 
 YetAnotherMacAwake (display: "Yet Another Mac Awake") — a macOS menu bar app (SwiftUI `MenuBarExtra`, macOS 14+) that keeps the
-screen awake and keeps you **Available in Microsoft Teams** during configurable
+screen awake and keeps you **Available in your messaging apps** (Teams, Slack, Discord, Zoom) during configurable
 per-day windows.
 
 No third-party dependencies. Swift Package Manager executable target. Ad-hoc
@@ -26,7 +26,7 @@ build.sh                               # release build → YetAnotherMacAwake.ap
 Sources/YetAnotherMacAwake/
 ├── YetAnotherMacAwakeApp.swift        # @main, MenuBarExtra menu, AppDelegate, CLI selftest
 ├── AppState.swift                     # single source of truth: mode/schedule → engine (30 s poll)
-├── AwakeEngine.swift                  # IOPM assertions + activity pulse; SettingsKey, PulseMethod, PulseKey
+├── AwakeEngine.swift                  # IOPM assertions + activity pulse; SettingsKey, PulseMethod, PulseKey, MessagingApp
 ├── ScheduleStore.swift                # per-day windows, Codable → UserDefaults; Mode, DaySchedule
 ├── AccessibilityMonitor.swift         # AXIsProcessTrusted poll (2 s) + grant flow
 └── SettingsView.swift                 # Settings scene: Schedule / Behavior / Permissions tabs
@@ -49,7 +49,7 @@ open YetAnotherMacAwake.app       # run the bundle
 ### Verify (do this after each feature)
 
 ```bash
-./.build/debug/YetAnotherMacAwake --selftest          # schedule logic, exit 0 = pass (35 cases)
+./.build/debug/YetAnotherMacAwake --selftest          # schedule logic, exit 0 = pass (44 cases)
 ./.build/debug/YetAnotherMacAwake --force-on          # activate without UI (for testing)
 ./.build/debug/YetAnotherMacAwake --pulse-now         # fire one pulse, print idle before/after, exit
 pmset -g assertions | grep -i yetanothermacawake      # both display+system assertions; screen-off mode shows only the system assertion
@@ -57,7 +57,7 @@ log stream --predicate 'composedMessage CONTAINS "YetAnotherMacAwake"'   # live 
 ```
 
 Expected log lines: `YetAnotherMacAwake pulse: silent key` | `YetAnotherMacAwake pulse: mouse jiggle`
-| `YetAnotherMacAwake pulse: screen off override` | `YetAnotherMacAwake pulse skipped: Teams not running`
+| `YetAnotherMacAwake pulse: screen off override` | `YetAnotherMacAwake pulse skipped: no selected messaging app running`
 | `YetAnotherMacAwake pulse skipped: screen off mode` | `YetAnotherMacAwake pulse skipped: on battery, sleep allowed`.
 
 ## Domain gotchas (learned the hard way — respect these)
@@ -73,11 +73,13 @@ Expected log lines: `YetAnotherMacAwake pulse: silent key` | `YetAnotherMacAwake
   (0,0) (this shipped once; it's a regression).
 - **`NSEvent.mouseLocation` → CG conversion**: flip Y against the primary
   screen's height (`NSScreen.screens.first(where: { $0.frame.origin == .zero })`).
-- **Pulse interval vs Teams threshold.** Teams flips to Away at ~5 min of idle.
+- **Pulse interval vs presence threshold.** Teams flips to Away at ~5 min of idle.
   Default pulse interval 120 s (range 30–600). 240 s is the outer safe bound —
   do not raise the default.
-- **Teams detection is bundle-ID based**: `com.microsoft.teams` (classic) and
-  `com.microsoft.teams2` (new). Both must match.
+- **Messaging-app detection is bundle-ID based**: Teams `com.microsoft.teams`
+  (classic) and `com.microsoft.teams2` (new), Slack `com.tinyspeck.slackmacgap`,
+  Discord `com.hnc.Discord`, Zoom `us.zoom.xos`. An app counts as running when
+  any of its bundle IDs matches.
 - **Accessibility grant resets on every rebuild** (ad-hoc signing changes the
   code hash). Re-grant in System Settings after `./build.sh`. UI must poll
   (`AccessibilityMonitor`) rather than read once at launch.
@@ -93,14 +95,14 @@ Expected log lines: `YetAnotherMacAwake pulse: silent key` | `YetAnotherMacAwake
   system assertion to `PreventSystemSleep` (`caffeinate -s`), which survives a
   closed lid while on AC power. Battery power ignores the assertion, and some
   Macs still sleep on lid-close without an external display (clamshell).
-- Pulse fires only when `settings.teamsOnly` is on AND Teams is running; the
-  sleep assertion still holds regardless (screen stays awake even if pulse is
-  skipped).
+- Pulse fires only when `settings.pulseApps` is non-empty AND at least one
+  selected app is running; an empty selection always pulses. The sleep assertion
+  still holds regardless (screen stays awake even if pulse is skipped).
 - **Screen-off mode pauses the pulse by default.** Any fake activity (F20/jiggle)
   resets the idle timer, which keeps the display from ever sleeping. When
   `settings.allowDisplaySleep` is on, `pulse()` early-returns and the engine
   holds only `PreventSystemSleep` (no display assertion) — unless
-  `settings.pulseWhenScreenOff` opts back in, trading display sleep for Teams
+  `settings.pulseWhenScreenOff` opts back in, trading display sleep for presence
   availability.
 - **"Disable for N" pause is ephemeral and overrides everything.** `AppState`
   holds `pausedUntil`/`pausedMinutes` in memory only (reset on relaunch, never
@@ -112,7 +114,7 @@ Expected log lines: `YetAnotherMacAwake pulse: silent key` | `YetAnotherMacAwake
 ## Persistence (UserDefaults keys)
 
 All keys are string constants in `SettingsKey` (`settings.onlyOnAC`,
-`settings.teamsOnly`, `settings.pulseMethod`, `settings.pulseIntervalSeconds`,
+`settings.pulseApps`, `settings.pulseMethod`, `settings.pulseIntervalSeconds`,
 `settings.pulseKey`, `settings.launchAtLogin`, `settings.allowDisplaySleep`,
 `settings.pulseWhenScreenOff`) and
 `ScheduleStore` (`schedule.mode`, `schedule.days`). `ScheduleStore` persists

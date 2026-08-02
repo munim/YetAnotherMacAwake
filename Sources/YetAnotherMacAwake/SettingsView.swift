@@ -5,7 +5,7 @@ struct SettingsView: View {
     @ObservedObject private var store = ScheduleStore.shared
     @ObservedObject private var ax = AccessibilityMonitor.shared
     @AppStorage(SettingsKey.onlyOnAC) private var onlyOnAC = false
-    @AppStorage(SettingsKey.teamsOnly) private var teamsOnly = true
+    @AppStorage(SettingsKey.pulseApps) private var pulseApps = PulseAppsSelection()
     @AppStorage(SettingsKey.pulseMethod) private var pulseMethodRaw = PulseMethod.auto.rawValue
     @AppStorage(SettingsKey.pulseIntervalSeconds) private var pulseInterval = 120
     @AppStorage(SettingsKey.pulseKey) private var pulseKeyRaw = PulseKey.f20.rawValue
@@ -252,8 +252,6 @@ struct SettingsView: View {
         )
     }
 
-
-
     // MARK: - Behavior
 
     private var behaviorTab: some View {
@@ -273,22 +271,32 @@ struct SettingsView: View {
             }
             Section("Power") {
                 Toggle("On battery, allow sleep", isOn: $onlyOnAC)
-                Text("On battery the Mac may sleep and Teams may go Away.")
+                Text("On battery the Mac may sleep and your presence may go Away.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            Section("Teams availability") {
-                Toggle("Only pulse when Microsoft Teams is running", isOn: $teamsOnly)
-                if allowDisplaySleep && teamsOnly && !pulseWhenScreenOff {
-                    Label("While the screen may sleep the Teams activity pulse pauses, so Teams may go Away.", systemImage: "exclamationmark.triangle.fill")
+            Section("Pulse only when one of these apps is running") {
+                ForEach(MessagingApp.allCases, id: \.self) { app in
+                    Toggle(app.label, isOn: pulseAppBinding(for: app))
+                }
+                .onChange(of: pulseApps) { _, _ in
+                    AppState.shared.evaluate()
+                }
+                Text("Leave all apps unchecked to always pulse. Checking one or more limits pulsing to when at least one of them is running.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Section("Presence") {
+                Toggle("Keep your presence Available even when the screen may sleep", isOn: $pulseWhenScreenOff)
+                    .disabled(!allowDisplaySleep)
+                Text("Re-enables the activity pulse in screen-may-sleep mode, so your presence stays Available — but the display may wake briefly or never sleep.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                if pulseApps.presenceMayGoAway(screenOff: allowDisplaySleep, overrideEnabled: pulseWhenScreenOff) {
+                    Label("While the screen may sleep the activity pulse pauses, so your presence may go Away.", systemImage: "exclamationmark.triangle.fill")
                         .font(.caption)
                         .foregroundStyle(.orange)
                 }
-                Toggle("Keep Teams Available even when the screen may sleep", isOn: $pulseWhenScreenOff)
-                    .disabled(!allowDisplaySleep)
-                Text("Re-enables the activity pulse in screen-may-sleep mode, so Teams stays Available — but the display may wake briefly or never sleep.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
                 Picker("Method", selection: $pulseMethodRaw) {
                     ForEach(PulseMethod.allCases, id: \.self) { method in
                         Text(method.label).tag(method.rawValue)
@@ -309,7 +317,7 @@ struct SettingsView: View {
                 .onChange(of: pulseInterval) { _, _ in
                     AppState.shared.evaluate()
                 }
-                Text("Shorter keeps Teams Available more reliably. Default 120 s; 240 s matches Teams' ~5-minute Away threshold.")
+                Text("Shorter keeps presence Available more reliably. Default 120 s; 240 s matches the ~5-minute Away threshold.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -318,6 +326,24 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
+    }
+
+    /// Per-app checkbox binding into the persisted selection. Reassigns the
+    /// whole struct so `@AppStorage` writes the new value (mutating a nested
+    /// property alone would not persist).
+    private func pulseAppBinding(for app: MessagingApp) -> Binding<Bool> {
+        Binding(
+            get: { pulseApps.apps.contains(app) },
+            set: { isOn in
+                var updated = pulseApps
+                if isOn {
+                    updated.apps.insert(app)
+                } else {
+                    updated.apps.remove(app)
+                }
+                pulseApps = updated
+            }
+        )
     }
 
     // MARK: - About
@@ -334,7 +360,7 @@ struct SettingsView: View {
             Text("Version \(version)")
                 .font(.caption)
                 .foregroundStyle(.secondary)
-            Text("Keeps the screen awake — even during long coding-agent runs — and keeps you Available in Microsoft Teams during your scheduled windows.")
+            Text("Keeps the screen awake — even during long coding-agent runs — and keeps you Available in your messaging apps (Teams, Slack, Discord, Zoom) during your scheduled windows.")
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: 380)

@@ -89,13 +89,15 @@ final class AppState: ObservableObject {
         let batteryDrop = !paused && engine.isActive
             && defaults.bool(forKey: SettingsKey.onlyOnAC)
             && !engine.onACPower
-        // Teams-pulse-paused: screen-may-sleep pauses the pulse while the
-        // user wants Teams availability, and no override is set.
-        let teamsPulsePaused = !paused && engine.isActive && screenOffEnabled
-            && defaults.bool(forKey: SettingsKey.teamsOnly)
-            && !defaults.bool(forKey: SettingsKey.pulseWhenScreenOff)
+        // Presence-pulse-paused: screen-may-sleep pauses the pulse while the
+        // user has opted into app gating (checked at least one app), and no
+        // override is set. Empty selection means always pulse, so no warning.
+        let presencePulsePaused = !paused && engine.isActive
+            && PulseAppsSelection.fromDefaults(defaults)
+                .presenceMayGoAway(screenOff: screenOffEnabled,
+                                   overrideEnabled: defaults.bool(forKey: SettingsKey.pulseWhenScreenOff))
         return Self.menuStatusText(base, paused: paused, screenOff: screenOffEnabled,
-                                   batteryDrop: batteryDrop, teamsPulsePaused: teamsPulsePaused)
+                                   batteryDrop: batteryDrop, presencePulsePaused: presencePulsePaused)
     }
 
     var menuIconName: String {
@@ -118,15 +120,15 @@ final class AppState: ObservableObject {
 
     /// Pure status-line formatter (menu + CLI self-test seam). Appends the
     /// " · Screen off" suffix, then the battery-drop suffix when the AC-only
-    /// rule drops assertions, then the Teams-pulse-paused warning. Pause
+    /// rule drops assertions, then the presence-pulse-paused warning. Pause
     /// countdown text is left untouched so a pause stays unambiguous.
     static func menuStatusText(_ base: String, paused: Bool, screenOff: Bool,
-                               batteryDrop: Bool, teamsPulsePaused: Bool) -> String {
+                               batteryDrop: Bool, presencePulsePaused: Bool) -> String {
         if paused { return base }
         var text = base
         if screenOff { text += " · Screen off" }
         if batteryDrop { text += " · On battery — sleep allowed" }
-        if teamsPulsePaused { text += " · Teams may go Away" }
+        if presencePulsePaused { text += " · Presence may go Away" }
         return text
     }
 
