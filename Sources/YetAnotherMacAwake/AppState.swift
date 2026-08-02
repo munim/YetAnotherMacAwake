@@ -91,7 +91,8 @@ final class AppState: ObservableObject {
             && !engine.onACPower
         // Presence-pulse-paused: screen-may-sleep pauses the pulse while the
         // user has opted into app gating (checked at least one app), and no
-        // override is set. Empty selection means always pulse, so no warning.
+        // override is set. An empty selection pauses the pulse entirely, so no
+        // warning.
         let presencePulsePaused = !paused && engine.isActive
             && PulseAppsSelection.fromDefaults(defaults)
                 .presenceMayGoAway(screenOff: screenOffEnabled,

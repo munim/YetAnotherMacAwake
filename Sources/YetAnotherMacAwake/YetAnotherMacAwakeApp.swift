@@ -157,7 +157,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         // Keep @AppStorage defaults and plain UserDefaults reads in sync.
         UserDefaults.standard.register(defaults: [
-            SettingsKey.pulseApps: "",
+            SettingsKey.pulseApps: "discord,slack,teams,zoom",
             SettingsKey.onlyOnAC: false,
             SettingsKey.pulseMethod: PulseMethod.auto.rawValue,
             SettingsKey.pulseIntervalSeconds: 120,
@@ -293,12 +293,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
               "profile: no battery rule + battery + screen may sleep -> systemOnly")
 
         // Pulse gate (pure function seam): selected apps + running bundle IDs ->
-        // pulse or skip. Empty selection means no gate (always pulse); otherwise
-        // any-of matching against each app's bundle-ID set.
-        check(AwakeEngine.pulseGate(selected: [], runningBundleIDs: ["com.apple.Safari"]) == true,
-              "gate: empty selection always pulses")
-        check(AwakeEngine.pulseGate(selected: [], runningBundleIDs: ["com.apple.Safari", "com.tinyspeck.slackmacgap"]) == true,
-              "gate: empty selection + unrelated apps running -> pulse")
+        // pulse or skip. Fires only while at least one selected app runs; an
+        // empty selection pauses the pulse entirely (never fires).
+        check(AwakeEngine.pulseGate(selected: [], runningBundleIDs: ["com.tinyspeck.slackmacgap"]) == false,
+              "gate: empty selection never pulses")
+        check(AwakeEngine.pulseGate(selected: [], runningBundleIDs: ["com.apple.Safari", "com.tinyspeck.slackmacgap"]) == false,
+              "gate: empty selection never pulses even with apps running")
         check(AwakeEngine.pulseGate(selected: [.slack], runningBundleIDs: ["com.tinyspeck.slackmacgap"]) == true,
               "gate: one selected + running -> pulse")
         check(AwakeEngine.pulseGate(selected: [.slack], runningBundleIDs: ["com.apple.Safari"]) == false,
@@ -313,6 +313,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
               "gate: teams new running -> pulse")
         check(AwakeEngine.pulseGate(selected: [.teams], runningBundleIDs: ["com.apple.Safari"]) == false,
               "gate: teams not running -> skip")
+
+        // Persistence encoding (pure seam): the comma-delimited raw-value string
+        // round-trips, and the default selection is all four apps checked.
+        check(PulseAppsSelection(Set(MessagingApp.allCases)).rawValue == "discord,slack,teams,zoom",
+              "persistence: default selection encodes all four apps")
+        check(PulseAppsSelection(rawValue: "discord,slack,teams,zoom").apps == Set(MessagingApp.allCases),
+              "persistence: all-apps string decodes to the full selection")
+        check(PulseAppsSelection(rawValue: "slack").apps == [.slack],
+              "persistence: partial selection decodes")
+        check(PulseAppsSelection(rawValue: "").apps.isEmpty,
+              "persistence: empty string decodes to empty selection")
 
         defaults.removePersistentDomain(forName: suite)
         print(failures == 0 ? "SELFTEST OK" : "SELFTEST FAILED (\(failures))")

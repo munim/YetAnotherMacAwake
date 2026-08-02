@@ -93,7 +93,8 @@ enum MessagingApp: String, CaseIterable {
 }
 
 /// The pulse-app selection, persisted as a comma-delimited string of raw values
-/// so `@AppStorage` can hold it. Empty selection means no gate (always pulse).
+/// so `@AppStorage` can hold it. Defaults to all known apps checked; an empty
+/// selection pauses the pulse entirely.
 struct PulseAppsSelection: RawRepresentable, Equatable {
     var apps: Set<MessagingApp> = []
 
@@ -208,12 +209,10 @@ final class AwakeEngine {
     }
 
     /// Pure decision: should the pulse fire given the selected apps and the
-    /// bundle IDs currently running. Empty selection means "always pulse" (no
-    /// gate); otherwise any selected app whose bundle IDs intersect the running
-    /// set suffices (any-of matching).
+    /// bundle IDs currently running. Fires only while at least one selected app
+    /// runs (any-of matching); an empty selection never pulses.
     static func pulseGate(selected: Set<MessagingApp>, runningBundleIDs: Set<String>) -> Bool {
-        guard !selected.isEmpty else { return true }
-        return selected.contains { !$0.bundleIDs.isDisjoint(with: runningBundleIDs) }
+        selected.contains { !$0.bundleIDs.isDisjoint(with: runningBundleIDs) }
     }
 
     private func holdAssertions(screenOff: Bool) {
@@ -258,16 +257,18 @@ final class AwakeEngine {
             NSLog("YetAnotherMacAwake pulse skipped: screen off mode")
             return
         }
-        // App gate: an empty selection pulses unconditionally; otherwise the
-        // pulse fires only while at least one selected app runs. Re-evaluated
-        // on every pulse, so launching or quitting an app applies next interval.
+        // App gate: the pulse fires only while at least one selected app runs;
+        // an empty selection pauses the pulse entirely (never fires). Re-evaluated
+        // on every pulse, so launching/quitting an app applies next interval.
         let selection = PulseAppsSelection.fromDefaults(defaults)
-        if !selection.apps.isEmpty {
-            let running = Set(NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier))
-            if !Self.pulseGate(selected: selection.apps, runningBundleIDs: running) {
-                NSLog("YetAnotherMacAwake pulse skipped: no selected messaging app running")
-                return
-            }
+        guard !selection.apps.isEmpty else {
+            NSLog("YetAnotherMacAwake pulse skipped: no messaging app selected")
+            return
+        }
+        let running = Set(NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier))
+        if !Self.pulseGate(selected: selection.apps, runningBundleIDs: running) {
+            NSLog("YetAnotherMacAwake pulse skipped: no selected messaging app running")
+            return
         }
         // The override still respects the AC-only rule: on battery with the rule
         // on the awake state is dropped entirely, so a pulse would fight it.

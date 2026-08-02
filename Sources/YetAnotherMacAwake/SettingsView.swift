@@ -5,7 +5,7 @@ struct SettingsView: View {
     @ObservedObject private var store = ScheduleStore.shared
     @ObservedObject private var ax = AccessibilityMonitor.shared
     @AppStorage(SettingsKey.onlyOnAC) private var onlyOnAC = false
-    @AppStorage(SettingsKey.pulseApps) private var pulseApps = PulseAppsSelection()
+    @AppStorage(SettingsKey.pulseApps) private var pulseApps = PulseAppsSelection(Set(MessagingApp.allCases))
     @AppStorage(SettingsKey.pulseMethod) private var pulseMethodRaw = PulseMethod.auto.rawValue
     @AppStorage(SettingsKey.pulseIntervalSeconds) private var pulseInterval = 120
     @AppStorage(SettingsKey.pulseKey) private var pulseKeyRaw = PulseKey.f20.rawValue
@@ -282,7 +282,7 @@ struct SettingsView: View {
                 .onChange(of: pulseApps) { _, _ in
                     AppState.shared.evaluate()
                 }
-                Text("Leave all apps unchecked to always pulse. Checking one or more limits pulsing to when at least one of them is running.")
+                Text("Pulse fires while at least one checked app is running. Uncheck all apps to pause the pulse.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

@@ -27,16 +27,15 @@ apps** in Settings. The pulse gates on *any checked app being running*.
 - The known list ships with four verified apps: **Teams, Slack, Discord, Zoom**.
   Each entry is a checkbox. Teams detection keeps matching both classic
   (`com.microsoft.teams`) and new (`com.microsoft.teams2`) clients.
-- **Default: nothing checked = always pulse.** There is no separate gate switch
-  and no "never pulse" state; an empty selection simply means the pulse fires
-  whenever the engine is active. Checking one or more apps makes the pulse fire
-  only while *at least one* of those apps is running (any-of matching).
+- **Default: all four apps checked.** The pulse fires only while *at least one*
+  checked app is running (any-of matching). Unchecking all apps pauses the pulse
+  entirely — an explicit never-pulse state; there is no separate gate switch.
 - The gate is re-evaluated on every pulse, so launching or quitting an app takes
   effect on the next interval (no extra polling, no manual refresh).
 - **No migration.** The old `settings.teamsOnly` key is removed from
   `SettingsKey`, the Settings UI, and the `UserDefaults.register` defaults; any
   stale value left in `UserDefaults` is ignored. Everyone — existing and new
-  users — lands on the new default: always pulse.
+  users — lands on the new default: all four apps checked.
 - Status text: the menu suffix "· Teams may go Away" becomes "· Presence may go
   Away". The skip log becomes "pulse skipped: no selected messaging app
   running". About copy becomes "keeps you Available in your messaging apps
@@ -49,10 +48,10 @@ apps** in Settings. The pulse gates on *any checked app being running*.
 
 1. As a user on Slack, I want the activity pulse to keep my Slack presence Available, so I stop flipping to Away during long runs.
 2. As a user on Discord or Zoom, I want the same idle-reset behavior I get on Teams, so my presence stays green on any platform.
-3. As a new user, I want the app to pulse always out of the box, so I'm kept active with zero setup.
+3. As a new user, I want all known messaging apps checked out of the box, so the pulse keeps me active with zero setup.
 4. As a user who wants pulsing only while a specific app runs, I want to check that app in Settings, so fake input doesn't fire when nothing relevant is running.
 5. As a user with several apps checked, I want the pulse to fire when any one of them is running, so having Slack open is enough even when Discord is closed.
-6. As a user with all apps unchecked, I want the pulse to always fire, so an empty selection means "no gate" rather than "never pulse".
+6. As a user with all apps unchecked, I want the pulse paused, so an empty selection means "never pulse" rather than an accidental always-pulse.
 7. As a user, I want the app list in Settings to show readable names (Teams, Slack, Discord, Zoom), so I can recognize what I'm selecting.
 8. As a Teams user, I want both the classic and new Teams clients detected, so my presence stays Available whichever client I run.
 9. As a user who quits every checked app, I want the pulse to skip with the generic log "pulse skipped: no selected messaging app running", so the log says why without naming a specific vendor.
@@ -84,19 +83,20 @@ apps** in Settings. The pulse gates on *any checked app being running*.
   codebase. Telegram (`ru.keepcoder.Telegram`) verified but deliberately not
   shipped in v1. Google Chat has no native macOS bundle ID (Chrome PWA only) and
   is excluded.
-- **Persistence**: a new `SettingsKey.pulseApps` holding an array of
-  `MessagingApp` raw values, default empty (= always pulse). `settings.teamsOnly`
+- **Persistence**: a new `SettingsKey.pulseApps` holding the selection of
+  `MessagingApp` raw values, default all four apps checked; an empty selection
+  pauses the pulse. `settings.teamsOnly`
   is removed from `SettingsKey`, `SettingsView`, and the
   `UserDefaults.register` defaults. Per the existing drift rule, the
   `@AppStorage` default and the `register` default must stay in sync. The exact
   array encoding (JSON `Data` vs delimited string) is settled at implementation;
   both keep the same default.
-- **Gate logic**: `pulse()` reads `pulseApps` each time it fires. If the
-  selection is empty it proceeds unconditionally. Otherwise it collects the
+- **Gate logic**: `pulse()` reads `pulseApps` each time it fires. An empty
+  selection pauses the pulse entirely (never fires). Otherwise it collects the
   bundle IDs of running apps from `NSWorkspace.shared.runningApplications` and
   delegates the pulse-vs-skip decision to a pure function
-  `pulseGate(selected:runningBundleIDs:) -> Bool`: true when the selection is
-  empty or any selected app's bundle IDs intersect the running set. On false it
+  `pulseGate(selected:runningBundleIDs:) -> Bool`: true when any selected app's
+  bundle IDs intersect the running set. On false it
   logs "pulse skipped: no selected messaging app running" and returns.
   `TeamsDetection` is replaced by this generalized running-app check.
 - **Status suffix**: the pure `menuStatusText` formatter's boolean parameter is
@@ -107,7 +107,7 @@ apps** in Settings. The pulse gates on *any checked app being running*.
   condition, so the warning only appears when the user has opted into app gating.
 - **Settings UI**: the Behavior tab's "Teams only" toggle is replaced by a
   "Pulse only when one of these apps is running" section with one checkbox per
-  known app, default all unchecked.
+  known app, default all checked.
 - **No migration**: the old key is simply never read; stale persisted values are
   inert.
 
@@ -125,12 +125,12 @@ apps** in Settings. The pulse gates on *any checked app being running*.
   `activeNow`, `nextBoundary`, the `assertionProfile` matrix, and the
   `menuStatusText` suffix cases from the `menu-screen-toggle` and
   `sleep-prevention-clarity` features. New cases extend those two seams.
-- Concrete new `pulseGate` cases: empty selection + any running apps → pulse;
-  one app selected and running → pulse; one selected and not running → skip;
-  two selected, one running → pulse (any-of); two selected, none running → skip;
-  Teams selected with classic bundle running → pulse; Teams selected with new
-  bundle running → pulse; Teams selected with neither running → skip; selection
-  empty while unrelated apps run → pulse.
+- Concrete new `pulseGate` cases: empty selection → never pulse (regardless of
+  running apps); one app selected and running → pulse; one selected and not
+  running → skip; two selected, one running → pulse (any-of); two selected, none
+  running → skip; Teams selected with classic bundle running → pulse; Teams
+  selected with new bundle running → pulse; Teams selected with neither running
+  → skip.
 - Concrete new `menuStatusText` cases: existing cases stay green with the renamed
   parameter and updated "· Presence may go Away" string; screen-may-sleep +
   presence pulsing → "Awake: On · Screen off · Presence may go Away"; all three
@@ -163,7 +163,8 @@ apps** in Settings. The pulse gates on *any checked app being running*.
 - Design was sharpened through a grilling session; decisions settled: scope
   (generalize the gate), shape (multi-select checkboxes, no gate switch), v1
   list (Teams, Slack, Discord, Zoom after bundle-ID verification), default
-  (empty selection = always pulse), migration (none), and copy ("Presence may go
+  (empty selection = always pulse — superseded 2026-08-02, see Comments),
+  migration (none), and copy ("Presence may go
   Away", generic skip log, generic About text).
 - Bundle-ID verification sources: Mac App Store lookup API (Slack, Telegram) and
   Homebrew cask definitions (Discord, Zoom). Google Chat was dropped after the
@@ -173,16 +174,30 @@ apps** in Settings. The pulse gates on *any checked app being running*.
   shift from "Teams" to "messaging apps"/"presence"; AGENTS.md and any
   domain-glossary copy should be refreshed in the same change so the repo's
   language matches the feature.
-- Consequence of the no-migration + empty-default decision: upgraded Teams users
-  silently switch from Teams-gated pulsing to always-pulse, and fresh installs
-  show no presence warning in screen-off mode until they check an app. This is
-  intentional.
+- Consequence of the no-migration + all-checked default: upgraded Teams users
+  keep gated pulsing (now across all four apps), and fresh installs show the
+  presence warning in screen-off mode out of the box.
 - Accessibility grant resets on every rebuild (ad-hoc signing) — re-grant in
   System Settings before keyboard-testing the pulse.
 - Verify after implementation: `swift build` clean, `--selftest` green (existing
   cases updated, new gate cases added), `./build.sh` bundle builds, and
   `--pulse-now` / `log stream` show the generic skip message under the expected
   selection/running combinations.
+
+## Comments
+
+- 2026-08-02: **Decision reversed (post-implementation).** The default selection
+  changed from "nothing checked = always pulse" to **all four apps checked**, and
+  an empty selection now means **never pulse** (pulse paused). Rationale from the
+  user: an all-off default read as "pulse off" and was confusing; keeping all
+  radios on makes the gated behavior the obvious default. Consequences:
+  `pulseGate` returns false for an empty selection, `pulse()` logs
+  "pulse skipped: no messaging app selected" for an empty selection, the
+  `UserDefaults.register` default is `"discord,slack,teams,zoom"`, and the
+  Settings caption now reads "Pulse fires while at least one checked app is
+  running. Uncheck all apps to pause the pulse." User stories 3 and 6 and the
+  pulseGate test list above were updated to match. Selftest now 48 cases.
+
 
 
 

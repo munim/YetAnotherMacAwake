@@ -49,7 +49,7 @@ open YetAnotherMacAwake.app       # run the bundle
 ### Verify (do this after each feature)
 
 ```bash
-./.build/debug/YetAnotherMacAwake --selftest          # schedule logic, exit 0 = pass (44 cases)
+./.build/debug/YetAnotherMacAwake --selftest          # schedule logic, exit 0 = pass (48 cases)
 ./.build/debug/YetAnotherMacAwake --force-on          # activate without UI (for testing)
 ./.build/debug/YetAnotherMacAwake --pulse-now         # fire one pulse, print idle before/after, exit
 pmset -g assertions | grep -i yetanothermacawake      # both display+system assertions; screen-off mode shows only the system assertion
@@ -58,7 +58,8 @@ log stream --predicate 'composedMessage CONTAINS "YetAnotherMacAwake"'   # live 
 
 Expected log lines: `YetAnotherMacAwake pulse: silent key` | `YetAnotherMacAwake pulse: mouse jiggle`
 | `YetAnotherMacAwake pulse: screen off override` | `YetAnotherMacAwake pulse skipped: no selected messaging app running`
-| `YetAnotherMacAwake pulse skipped: screen off mode` | `YetAnotherMacAwake pulse skipped: on battery, sleep allowed`.
+| `YetAnotherMacAwake pulse skipped: no messaging app selected` | `YetAnotherMacAwake pulse skipped: screen off mode`
+| `YetAnotherMacAwake pulse skipped: on battery, sleep allowed`.
 
 ## Domain gotchas (learned the hard way — respect these)
 
@@ -95,9 +96,10 @@ Expected log lines: `YetAnotherMacAwake pulse: silent key` | `YetAnotherMacAwake
   system assertion to `PreventSystemSleep` (`caffeinate -s`), which survives a
   closed lid while on AC power. Battery power ignores the assertion, and some
   Macs still sleep on lid-close without an external display (clamshell).
-- Pulse fires only when `settings.pulseApps` is non-empty AND at least one
-  selected app is running; an empty selection always pulses. The sleep assertion
-  still holds regardless (screen stays awake even if pulse is skipped).
+- Pulse fires only while at least one selected app is running; an empty
+  selection pauses the pulse entirely (never fires). Default is all four apps
+  checked. The sleep assertion still holds regardless (screen stays awake even
+  if pulse is skipped).
 - **Screen-off mode pauses the pulse by default.** Any fake activity (F20/jiggle)
   resets the idle timer, which keeps the display from ever sleeping. When
   `settings.allowDisplaySleep` is on, `pulse()` early-returns and the engine
