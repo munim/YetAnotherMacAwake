@@ -51,5 +51,5 @@ jobs:
             "YetAnotherMacAwake-${VERSION}-universal-macos.zip.sha256" \
             "YetAnotherMacAwake-${VERSION}-universal-macos.dmg" \
             "YetAnotherMacAwake-${VERSION}-universal-macos.dmg.sha256" \
-            --title "Yet Another Mac Awake ${VERSION}" \
+            --title "$GITHUB_REF_NAME" \
             --generate-notes
