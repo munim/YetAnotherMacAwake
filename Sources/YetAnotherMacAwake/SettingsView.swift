@@ -98,7 +98,7 @@ struct SettingsView: View {
             Divider()
 
             VStack(alignment: .leading, spacing: 4) {
-                Text("Individual times (optional — override the batch window per day)")
+                Text("Individual times (optional — override the batch window per day; click the circle to enable or disable a day)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 VStack(spacing: 0) {
@@ -197,18 +197,35 @@ struct SettingsView: View {
     private func dayTimeRow(index: Int, name: String) -> some View {
         let isEnabled = store.days[index].enabled
         return HStack(spacing: 8) {
-            Text(name)
-                .frame(width: 80, alignment: .leading)
-                .foregroundStyle(isEnabled ? .primary : .secondary)
-            DatePicker("", selection: perDayStartBinding(index), displayedComponents: .hourAndMinute)
-                .labelsHidden()
-            Text("–")
-                .foregroundStyle(isEnabled ? .primary : .secondary)
-            DatePicker("", selection: perDayEndBinding(index), displayedComponents: .hourAndMinute)
-                .labelsHidden()
-            Spacer()
-            Image(systemName: isEnabled ? "checkmark.circle.fill" : "circle")
-                .foregroundStyle(isEnabled ? Color.green : Color.secondary.opacity(0.4))
+            Button {
+                store.days[index].enabled.toggle()
+                if store.days[index].enabled {
+                    selectedDays.insert(index)
+                } else {
+                    selectedDays.remove(index)
+                }
+                store.save()
+            } label: {
+                Image(systemName: isEnabled ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 16))
+                    .foregroundStyle(isEnabled ? Color.green : Color.secondary.opacity(0.4))
+            }
+            .buttonStyle(.plain)
+            .help(isEnabled ? "Enabled — click to disable this day" : "Disabled — click to enable this day")
+            HStack(spacing: 8) {
+                Text(name)
+                    .frame(width: 80, alignment: .leading)
+                    .foregroundStyle(isEnabled ? .primary : .secondary)
+                DatePicker("", selection: perDayStartBinding(index), displayedComponents: .hourAndMinute)
+                    .labelsHidden()
+                Text("–")
+                    .foregroundStyle(isEnabled ? .primary : .secondary)
+                DatePicker("", selection: perDayEndBinding(index), displayedComponents: .hourAndMinute)
+                    .labelsHidden()
+                Spacer()
+            }
+            .opacity(isEnabled ? 1 : 0.4)
+            .allowsHitTesting(isEnabled)
         }
         .padding(.vertical, 2)
     }
