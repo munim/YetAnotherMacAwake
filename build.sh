@@ -14,12 +14,16 @@ MODE="${2:-native}"
 if [ "$MODE" = "universal" ]; then
     # Cross-compile a fat binary in one pass (SDK ships both slices).
     swift build -c release --arch arm64 --arch x86_64
+    BIN_DIR=$(swift build -c release --arch arm64 --arch x86_64 --show-bin-path)
 else
     # Plain branch instead of "${ARCH_ARGS[@]}" — macOS bash 3.2 + set -u
     # treats an empty array expansion as an unbound variable.
     swift build -c release
+    BIN_DIR=$(swift build -c release --show-bin-path)
 fi
-BIN=".build/release/$APP_NAME"
+# --show-bin-path: multi-arch builds land outside .build/release (xcbuild
+# pipeline), so ask SPM for the real output dir instead of hardcoding one.
+BIN="$BIN_DIR/$APP_NAME"
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
