@@ -1,0 +1,55 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'                  # fires when a v-prefixed tag is created/pushed
+
+permissions:
+  contents: write             # needed to create the GitHub Release
+
+jobs:
+  build-and-release:
+    runs-on: macos-14         # pinned; preinstalled Xcode/Swift
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build + self-test (gates release; exit 0/1)
+        run: |
+          swift build
+          ./.build/debug/YetAnotherMacAwake --selftest
+
+      - name: Build universal .app with version from tag
+        run: ./build.sh "${GITHUB_REF_NAME#v}" universal
+
+      - name: Verify universal binary + version
+        run: |
+          lipo -info YetAnotherMacAwake.app/Contents/MacOS/YetAnotherMacAwake
+          plutil -p YetAnotherMacAwake.app/Contents/Info.plist | grep -E 'CFBundleShortVersionString|CFBundleVersion'
+
+      - name: Package ZIP
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          ditto -c -k --keepParent YetAnotherMacAwake.app "YetAnotherMacAwake-${VERSION}-universal-macos.zip"
+          shasum -a 256 "YetAnotherMacAwake-${VERSION}-universal-macos.zip" > "YetAnotherMacAwake-${VERSION}-universal-macos.zip.sha256"
+
+      - name: Package DMG
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          hdiutil create -volname "Yet Another Mac Awake" \
+            -srcfolder YetAnotherMacAwake.app -ov -format UDZO \
+            "YetAnotherMacAwake-${VERSION}-universal-macos.dmg"
+          shasum -a 256 "YetAnotherMacAwake-${VERSION}-universal-macos.dmg" > "YetAnotherMacAwake-${VERSION}-universal-macos.dmg.sha256"
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}    # official gh CLI — zero third-party Actions
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          gh release create "$GITHUB_REF_NAME" \
+            "YetAnotherMacAwake-${VERSION}-universal-macos.zip" \
+            "YetAnotherMacAwake-${VERSION}-universal-macos.zip.sha256" \
+            "YetAnotherMacAwake-${VERSION}-universal-macos.dmg" \
+            "YetAnotherMacAwake-${VERSION}-universal-macos.dmg.sha256" \
+            --title "Yet Another Mac Awake ${VERSION}" \
+            --generate-notes
