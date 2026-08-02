@@ -153,3 +153,17 @@ any behavior change smoke-tested with the verify commands above.
 
 
 
+
+## Agent skills
+
+### Issue tracker
+
+Specs and issues live as local markdown under `.scratch/<feature>/`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Five canonical labels, same strings as the skills: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context — one `CONTEXT.md` + `docs/adr/` at the repo root when they exist. See `docs/agents/domain.md`.
