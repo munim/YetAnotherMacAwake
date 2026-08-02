@@ -102,7 +102,7 @@ struct MenuContentView: View {
                 Image(systemName: isSelected ? "circle.inset.filled" : "circle")
                     .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
                 Image(systemName: screenOff ? "moon.fill" : "sun.max.fill")
-                Text(screenOff ? "Screen Off" : "Screen On")
+                Text(screenOff ? "Screen Can Sleep" : "Screen Stays On")
                     .font(.system(size: 11, weight: .semibold))
             }
             .font(.system(size: 12))
