@@ -80,15 +80,38 @@ final class AppState: ObservableObject {
     }
 
     var stateText: String {
-        if isPaused {
-            return "Disabled · \(Self.mmss(remainingSeconds)) left"
-        }
-        return store.stateText(now: now)
+        let paused = isPaused
+        let base = paused
+            ? "Disabled · \(Self.mmss(remainingSeconds)) left"
+            : store.stateText(now: now)
+        return Self.menuStatusText(base, paused: paused, screenOff: screenOffEnabled)
     }
 
     var menuIconName: String {
         if isPaused { return "pause.circle.fill" }
         return engine.isActive ? "flame.fill" : "flame"
+    }
+
+    /// Persisted display-sleep preference (`settings.allowDisplaySleep`); Screen
+    /// On radios read it directly so the menu mirrors Settings with one source.
+    var screenOffEnabled: Bool {
+        UserDefaults.standard.bool(forKey: SettingsKey.allowDisplaySleep)
+    }
+
+    /// Flip display behavior from the menu radios: persist the existing key and
+    /// re-evaluate so the engine swaps assertion types immediately (no 30 s poll).
+    func setScreenOff(_ enabled: Bool) {
+        UserDefaults.standard.set(enabled, forKey: SettingsKey.allowDisplaySleep)
+        evaluate()
+    }
+
+    /// Pure status-line formatter (menu + CLI self-test seam). Appends
+    /// " · Screen off" only to normal mode-driven status text; pause countdown
+    /// text is left untouched so a pause stays unambiguous.
+    static func menuStatusText(_ base: String, paused: Bool, screenOff: Bool) -> String {
+        if paused { return base }
+        if screenOff { return base + " · Screen off" }
+        return base
     }
 
     private static func mmss(_ seconds: Int) -> String {

@@ -37,6 +37,14 @@ struct MenuContentView: View {
 
         Divider()
 
+        HStack(spacing: 8) {
+            screenRadio(screenOff: false)
+            screenRadio(screenOff: true)
+        }
+        .padding(.horizontal, 2)
+
+        Divider()
+
         Menu {
             ForEach(pauseOptions, id: \.minutes) { option in
                 Button {
@@ -81,6 +89,29 @@ struct MenuContentView: View {
         (30, "30 min"),
         (60, "1 hour"),
     ]
+
+    /// Screen On/Off radio: filled circle + SF Symbol + label. Always enabled
+    /// (persistent preference, pre-armed even while the engine is off or paused);
+    /// selecting writes the existing display-sleep key and re-evaluates at once.
+    private func screenRadio(screenOff: Bool) -> some View {
+        let isSelected = screenOff == state.screenOffEnabled
+        return Button {
+            state.setScreenOff(screenOff)
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: isSelected ? "circle.inset.filled" : "circle")
+                    .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
+                Image(systemName: screenOff ? "moon.fill" : "sun.max.fill")
+                Text(screenOff ? "Screen Off" : "Screen On")
+                    .font(.system(size: 11, weight: .semibold))
+            }
+            .font(.system(size: 12))
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 8)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
 
     /// Selectable mode card: icon + title + subtitle, accent-highlighted when active.
     private func modeBox(_ mode: Mode, icon: String, title: String, subtitle: String) -> some View {
@@ -205,6 +236,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         check(!store.activeNow(now: at8), "scheduled inactive outside window")
         let expected18 = cal.date(from: DateComponents(year: 2026, month: 8, day: 3, hour: 18))!
         check(store.nextBoundary(now: at10) == expected18, "next boundary after 10:00 is 18:00")
+
+        // Menu status line: Screen On/Off suffix (pure function seam; no singletons).
+        store.mode = .on
+        let modeOnText = store.stateText(now: at10)   // "Awake: On"
+        check(AppState.menuStatusText(modeOnText, paused: false, screenOff: false) == "Awake: On",
+              "status line unchanged: mode on + screen on")
+        check(AppState.menuStatusText(modeOnText, paused: false, screenOff: true) == "Awake: On · Screen off",
+              "status line suffix: mode on + screen off")
+        store.mode = .off
+        let modeOffText = store.stateText(now: at10)  // "Awake: Off"
+        check(AppState.menuStatusText(modeOffText, paused: false, screenOff: true) == "Awake: Off · Screen off",
+              "status line suffix: mode off + screen off")
+        store.mode = .scheduled
+        let scheduledText = store.stateText(now: at10)  // "Awake: On · until 18:00"
+        check(AppState.menuStatusText(scheduledText, paused: false, screenOff: true) == "Awake: On · until 18:00 · Screen off",
+              "status line suffix: scheduled active + screen off")
+        check(AppState.menuStatusText("Disabled · 5:00 left", paused: true, screenOff: true) == "Disabled · 5:00 left",
+              "pause countdown untouched: screen off")
+        check(AppState.menuStatusText("Disabled · 5:00 left", paused: true, screenOff: false) == "Disabled · 5:00 left",
+              "pause countdown untouched: screen on")
 
         defaults.removePersistentDomain(forName: suite)
         print(failures == 0 ? "SELFTEST OK" : "SELFTEST FAILED (\(failures))")
