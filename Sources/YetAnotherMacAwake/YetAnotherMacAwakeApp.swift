@@ -23,15 +23,7 @@ struct MenuContentView: View {
     @ObservedObject private var state = AppState.shared
 
     var body: some View {
-        HStack(spacing: 6) {
-            Image(systemName: state.menuIconName)
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(state.engine.isActive ? Color.green : Color.secondary)
-            Text(state.stateText)
-                .font(.system(size: 12, weight: .medium))
-                .lineLimit(1)
-                .minimumScaleFactor(0.85)
-        }
+        Label(state.stateText, systemImage: state.menuIconName)
         .padding(.vertical, 2)
 
         Divider()
