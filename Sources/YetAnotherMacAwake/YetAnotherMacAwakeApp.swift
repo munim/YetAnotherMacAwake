@@ -45,12 +45,50 @@ struct MenuContentView: View {
 
         Divider()
 
+        Menu {
+            ForEach(pauseOptions, id: \.minutes) { option in
+                Button {
+                    state.pause(for: option.minutes)
+                } label: {
+                    if state.pausedMinutes == option.minutes {
+                        Label(option.label, systemImage: "checkmark")
+                    } else {
+                        Text(option.label)
+                    }
+                }
+            }
+        } label: {
+            Text("Disable for…")
+        }
+        // Grayed when there is nothing to disable (engine already off and not paused).
+        .disabled(!state.engine.isActive && !state.isPaused)
+
+        if state.isPaused {
+            Button {
+                state.resume()
+            } label: {
+                Label("Resume now", systemImage: "play.fill")
+            }
+        }
+
+        Divider()
+
         SettingsLink { Text("Settings…") }
 
         Divider()
 
         Button("Quit Yet Another Mac Awake") { NSApp.terminate(nil) }
     }
+
+    /// Disable durations shown in the menu submenu, in minutes.
+    private let pauseOptions: [(minutes: Int, label: String)] = [
+        (1, "1 min"),
+        (5, "5 min"),
+        (10, "10 min"),
+        (15, "15 min"),
+        (30, "30 min"),
+        (60, "1 hour"),
+    ]
 
     /// Selectable mode card: icon + title + subtitle, accent-highlighted when active.
     private func modeBox(_ mode: Mode, icon: String, title: String, subtitle: String) -> some View {

@@ -99,6 +99,12 @@ Expected log lines: `YetAnotherMacAwake pulse: silent key` | `YetAnotherMacAwake
   the idle timer, which keeps the display from ever sleeping. When
   `settings.allowDisplaySleep` is on, `pulse()` early-returns and the engine
   holds only `PreventSystemSleep` (no display assertion).
+- **"Disable for N" pause is ephemeral and overrides everything.** `AppState`
+  holds `pausedUntil`/`pausedMinutes` in memory only (reset on relaunch, never
+  persisted). While paused, `evaluate()` forces the engine off regardless of
+  mode/schedule/AC rule; a 1 s ticker counts down and clears the pause the
+  moment it expires, then `evaluate()` restores mode/schedule state. Mode card
+  clicks still land during a pause but apply only after it ends.
 
 ## Persistence (UserDefaults keys)
 
