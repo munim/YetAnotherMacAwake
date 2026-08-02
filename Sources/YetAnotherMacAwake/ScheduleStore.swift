@@ -22,7 +22,7 @@ final class ScheduleStore: ObservableObject {
         "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"
     ]
 
-    @Published var mode: Mode = .off
+    @Published var mode: Mode = .scheduled
     @Published var days: [DaySchedule] = Array(repeating: DaySchedule(), count: 7)
 
     private let defaults: UserDefaults
