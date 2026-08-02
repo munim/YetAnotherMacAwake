@@ -84,7 +84,18 @@ final class AppState: ObservableObject {
         let base = paused
             ? "Disabled · \(Self.mmss(remainingSeconds)) left"
             : store.stateText(now: now)
-        return Self.menuStatusText(base, paused: paused, screenOff: screenOffEnabled)
+        let defaults = UserDefaults.standard
+        // Battery-drop: awake active but the AC-only rule drops assertions.
+        let batteryDrop = !paused && engine.isActive
+            && defaults.bool(forKey: SettingsKey.onlyOnAC)
+            && !engine.onACPower
+        // Teams-pulse-paused: screen-may-sleep pauses the pulse while the
+        // user wants Teams availability, and no override is set.
+        let teamsPulsePaused = !paused && engine.isActive && screenOffEnabled
+            && defaults.bool(forKey: SettingsKey.teamsOnly)
+            && !defaults.bool(forKey: SettingsKey.pulseWhenScreenOff)
+        return Self.menuStatusText(base, paused: paused, screenOff: screenOffEnabled,
+                                   batteryDrop: batteryDrop, teamsPulsePaused: teamsPulsePaused)
     }
 
     var menuIconName: String {
@@ -105,13 +116,18 @@ final class AppState: ObservableObject {
         evaluate()
     }
 
-    /// Pure status-line formatter (menu + CLI self-test seam). Appends
-    /// " · Screen off" only to normal mode-driven status text; pause countdown
-    /// text is left untouched so a pause stays unambiguous.
-    static func menuStatusText(_ base: String, paused: Bool, screenOff: Bool) -> String {
+    /// Pure status-line formatter (menu + CLI self-test seam). Appends the
+    /// " · Screen off" suffix, then the battery-drop suffix when the AC-only
+    /// rule drops assertions, then the Teams-pulse-paused warning. Pause
+    /// countdown text is left untouched so a pause stays unambiguous.
+    static func menuStatusText(_ base: String, paused: Bool, screenOff: Bool,
+                               batteryDrop: Bool, teamsPulsePaused: Bool) -> String {
         if paused { return base }
-        if screenOff { return base + " · Screen off" }
-        return base
+        var text = base
+        if screenOff { text += " · Screen off" }
+        if batteryDrop { text += " · On battery — sleep allowed" }
+        if teamsPulsePaused { text += " · Teams may go Away" }
+        return text
     }
 
     private static func mmss(_ seconds: Int) -> String {

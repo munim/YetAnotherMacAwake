@@ -11,6 +11,7 @@ struct SettingsView: View {
     @AppStorage(SettingsKey.pulseKey) private var pulseKeyRaw = PulseKey.f20.rawValue
     @AppStorage(SettingsKey.launchAtLogin) private var launchAtLogin = false
     @AppStorage(SettingsKey.allowDisplaySleep) private var allowDisplaySleep = false
+    @AppStorage(SettingsKey.pulseWhenScreenOff) private var pulseWhenScreenOff = false
     @State private var syncingLaunchAtLogin = false
     @State private var selectedDays: Set<Int> = []
     @State private var templateStart = Date()
@@ -257,8 +258,37 @@ struct SettingsView: View {
 
     private var behaviorTab: some View {
         Form {
-            Section("Activity pulse") {
+            Section("Awake behavior") {
+                Picker("What stays awake?", selection: $allowDisplaySleep) {
+                    Text("Screen and system").tag(false)
+                    Text("System only — screen may sleep").tag(true)
+                }
+                .pickerStyle(.radioGroup)
+                .onChange(of: allowDisplaySleep) { _, _ in
+                    AppState.shared.evaluate()
+                }
+                Text("Screen and system keeps the display on while awake. System only lets the display sleep on its normal timer while the system keeps running — even with the lid closed; it needs AC power (battery ignores the system assertion).")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Section("Power") {
+                Toggle("On battery, allow sleep", isOn: $onlyOnAC)
+                Text("On battery the Mac may sleep and Teams may go Away.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Section("Teams availability") {
                 Toggle("Only pulse when Microsoft Teams is running", isOn: $teamsOnly)
+                if allowDisplaySleep && teamsOnly && !pulseWhenScreenOff {
+                    Label("While the screen may sleep the Teams activity pulse pauses, so Teams may go Away.", systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+                Toggle("Keep Teams Available even when the screen may sleep", isOn: $pulseWhenScreenOff)
+                    .disabled(!allowDisplaySleep)
+                Text("Re-enables the activity pulse in screen-may-sleep mode, so Teams stays Available — but the display may wake briefly or never sleep.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 Picker("Method", selection: $pulseMethodRaw) {
                     ForEach(PulseMethod.allCases, id: \.self) { method in
                         Text(method.label).tag(method.rawValue)
@@ -280,19 +310,6 @@ struct SettingsView: View {
                     AppState.shared.evaluate()
                 }
                 Text("Shorter keeps Teams Available more reliably. Default 120 s; 240 s matches Teams' ~5-minute Away threshold.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            Section("Sleep prevention") {
-                Toggle("Allow display to sleep while awake", isOn: $allowDisplaySleep)
-                    .onChange(of: allowDisplaySleep) { _, _ in
-                        AppState.shared.evaluate()
-                    }
-                Text("The display sleeps on its normal timer while the system keeps running — even with the lid closed. Requires AC power (battery ignores the system assertion); the Teams activity pulse pauses so the screen can turn off.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Toggle("Prevent sleep only on AC power", isOn: $onlyOnAC)
-                Text("On battery the display may sleep and Teams may go Away.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

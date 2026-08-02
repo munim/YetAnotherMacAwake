@@ -49,7 +49,7 @@ open YetAnotherMacAwake.app       # run the bundle
 ### Verify (do this after each feature)
 
 ```bash
-./.build/debug/YetAnotherMacAwake --selftest          # schedule logic, exit 0 = pass (15 cases)
+./.build/debug/YetAnotherMacAwake --selftest          # schedule logic, exit 0 = pass (35 cases)
 ./.build/debug/YetAnotherMacAwake --force-on          # activate without UI (for testing)
 ./.build/debug/YetAnotherMacAwake --pulse-now         # fire one pulse, print idle before/after, exit
 pmset -g assertions | grep -i yetanothermacawake      # both display+system assertions; screen-off mode shows only the system assertion
@@ -57,7 +57,8 @@ log stream --predicate 'composedMessage CONTAINS "YetAnotherMacAwake"'   # live 
 ```
 
 Expected log lines: `YetAnotherMacAwake pulse: silent key` | `YetAnotherMacAwake pulse: mouse jiggle`
-| `YetAnotherMacAwake pulse skipped: Teams not running` | `YetAnotherMacAwake pulse skipped: screen off mode`.
+| `YetAnotherMacAwake pulse: screen off override` | `YetAnotherMacAwake pulse skipped: Teams not running`
+| `YetAnotherMacAwake pulse skipped: screen off mode` | `YetAnotherMacAwake pulse skipped: on battery, sleep allowed`.
 
 ## Domain gotchas (learned the hard way — respect these)
 
@@ -95,10 +96,12 @@ Expected log lines: `YetAnotherMacAwake pulse: silent key` | `YetAnotherMacAwake
 - Pulse fires only when `settings.teamsOnly` is on AND Teams is running; the
   sleep assertion still holds regardless (screen stays awake even if pulse is
   skipped).
-- **Screen-off mode pauses the pulse.** Any fake activity (F20/jiggle) resets
-  the idle timer, which keeps the display from ever sleeping. When
+- **Screen-off mode pauses the pulse by default.** Any fake activity (F20/jiggle)
+  resets the idle timer, which keeps the display from ever sleeping. When
   `settings.allowDisplaySleep` is on, `pulse()` early-returns and the engine
-  holds only `PreventSystemSleep` (no display assertion).
+  holds only `PreventSystemSleep` (no display assertion) — unless
+  `settings.pulseWhenScreenOff` opts back in, trading display sleep for Teams
+  availability.
 - **"Disable for N" pause is ephemeral and overrides everything.** `AppState`
   holds `pausedUntil`/`pausedMinutes` in memory only (reset on relaunch, never
   persisted). While paused, `evaluate()` forces the engine off regardless of
@@ -110,7 +113,8 @@ Expected log lines: `YetAnotherMacAwake pulse: silent key` | `YetAnotherMacAwake
 
 All keys are string constants in `SettingsKey` (`settings.onlyOnAC`,
 `settings.teamsOnly`, `settings.pulseMethod`, `settings.pulseIntervalSeconds`,
-`settings.pulseKey`, `settings.launchAtLogin`, `settings.allowDisplaySleep`) and
+`settings.pulseKey`, `settings.launchAtLogin`, `settings.allowDisplaySleep`,
+`settings.pulseWhenScreenOff`) and
 `ScheduleStore` (`schedule.mode`, `schedule.days`). `ScheduleStore` persists
 `[DaySchedule]` (7, Monday=0…Sunday=6) as JSON under `schedule.days`, mode under
 `schedule.mode`. Keep `@AppStorage` defaults and `UserDefaults.register`

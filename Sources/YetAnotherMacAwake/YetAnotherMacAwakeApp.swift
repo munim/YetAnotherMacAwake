@@ -163,6 +163,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             SettingsKey.pulseIntervalSeconds: 120,
             SettingsKey.pulseKey: PulseKey.f20.rawValue,
             SettingsKey.allowDisplaySleep: false,
+            SettingsKey.pulseWhenScreenOff: false,
         ])
         NSApp.setActivationPolicy(.accessory)
         AppState.shared.start()
@@ -237,25 +238,59 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let expected18 = cal.date(from: DateComponents(year: 2026, month: 8, day: 3, hour: 18))!
         check(store.nextBoundary(now: at10) == expected18, "next boundary after 10:00 is 18:00")
 
-        // Menu status line: Screen On/Off suffix (pure function seam; no singletons).
+        // Menu status line: Screen On/Off + battery-drop + Teams-pulse suffixes
+        // (pure function seam; no singletons).
         store.mode = .on
         let modeOnText = store.stateText(now: at10)   // "Awake: On"
-        check(AppState.menuStatusText(modeOnText, paused: false, screenOff: false) == "Awake: On",
+        check(AppState.menuStatusText(modeOnText, paused: false, screenOff: false, batteryDrop: false, teamsPulsePaused: false) == "Awake: On",
               "status line unchanged: mode on + screen on")
-        check(AppState.menuStatusText(modeOnText, paused: false, screenOff: true) == "Awake: On · Screen off",
+        check(AppState.menuStatusText(modeOnText, paused: false, screenOff: true, batteryDrop: false, teamsPulsePaused: false) == "Awake: On · Screen off",
               "status line suffix: mode on + screen off")
         store.mode = .off
         let modeOffText = store.stateText(now: at10)  // "Awake: Off"
-        check(AppState.menuStatusText(modeOffText, paused: false, screenOff: true) == "Awake: Off · Screen off",
+        check(AppState.menuStatusText(modeOffText, paused: false, screenOff: true, batteryDrop: false, teamsPulsePaused: false) == "Awake: Off · Screen off",
               "status line suffix: mode off + screen off")
         store.mode = .scheduled
         let scheduledText = store.stateText(now: at10)  // "Awake: On · until 18:00"
-        check(AppState.menuStatusText(scheduledText, paused: false, screenOff: true) == "Awake: On · until 18:00 · Screen off",
+        check(AppState.menuStatusText(scheduledText, paused: false, screenOff: true, batteryDrop: false, teamsPulsePaused: false) == "Awake: On · until 18:00 · Screen off",
               "status line suffix: scheduled active + screen off")
-        check(AppState.menuStatusText("Disabled · 5:00 left", paused: true, screenOff: true) == "Disabled · 5:00 left",
-              "pause countdown untouched: screen off")
-        check(AppState.menuStatusText("Disabled · 5:00 left", paused: true, screenOff: false) == "Disabled · 5:00 left",
+        check(AppState.menuStatusText("Disabled · 5:00 left", paused: true, screenOff: true, batteryDrop: true, teamsPulsePaused: true) == "Disabled · 5:00 left",
+              "pause countdown untouched: screen off + battery + teams flags")
+        check(AppState.menuStatusText("Disabled · 5:00 left", paused: true, screenOff: false, batteryDrop: true, teamsPulsePaused: false) == "Disabled · 5:00 left",
               "pause countdown untouched: screen on")
+        // Battery-drop suffix: awake active + AC rule on + on battery.
+        check(AppState.menuStatusText(modeOnText, paused: false, screenOff: false, batteryDrop: true, teamsPulsePaused: false) == "Awake: On · On battery — sleep allowed",
+              "status line suffix: on battery + AC rule + active")
+        // Teams-pulse-paused suffix: screen-may-sleep + Teams pulsing, no override.
+        check(AppState.menuStatusText(modeOnText, paused: false, screenOff: true, batteryDrop: false, teamsPulsePaused: true) == "Awake: On · Screen off · Teams may go Away",
+              "status line suffix: screen may sleep + teams pulsing")
+        check(AppState.menuStatusText(modeOnText, paused: false, screenOff: true, batteryDrop: false, teamsPulsePaused: false) == "Awake: On · Screen off",
+              "status line suffix: screen may sleep + override on -> no teams suffix")
+        // All three suffixes compose in order: Screen off, battery, Teams.
+        check(AppState.menuStatusText(modeOnText, paused: false, screenOff: true, batteryDrop: true, teamsPulsePaused: true) == "Awake: On · Screen off · On battery — sleep allowed · Teams may go Away",
+              "status line suffix: all three compose in order")
+
+        // Assertion profile (pure function seam): settings + power state -> held set.
+        check(AwakeEngine.assertionProfile(active: false, onlyOnAC: true, onACPower: false, allowDisplaySleep: true) == .none,
+              "profile: inactive + battery + screen-off -> none")
+        check(AwakeEngine.assertionProfile(active: false, onlyOnAC: false, onACPower: true, allowDisplaySleep: false) == .none,
+              "profile: inactive -> none regardless of settings")
+        check(AwakeEngine.assertionProfile(active: true, onlyOnAC: false, onACPower: true, allowDisplaySleep: false) == .screenAndSystem,
+              "profile: active, no battery rule, screen on -> screenAndSystem")
+        check(AwakeEngine.assertionProfile(active: true, onlyOnAC: false, onACPower: true, allowDisplaySleep: true) == .systemOnly,
+              "profile: active, screen may sleep -> systemOnly")
+        check(AwakeEngine.assertionProfile(active: true, onlyOnAC: true, onACPower: true, allowDisplaySleep: false) == .screenAndSystem,
+              "profile: AC rule on + AC + screen on -> screenAndSystem")
+        check(AwakeEngine.assertionProfile(active: true, onlyOnAC: true, onACPower: true, allowDisplaySleep: true) == .systemOnly,
+              "profile: AC rule on + AC + screen may sleep -> systemOnly")
+        check(AwakeEngine.assertionProfile(active: true, onlyOnAC: true, onACPower: false, allowDisplaySleep: false) == .none,
+              "profile: AC rule on + battery -> none")
+        check(AwakeEngine.assertionProfile(active: true, onlyOnAC: true, onACPower: false, allowDisplaySleep: true) == .none,
+              "profile: AC rule on + battery + screen may sleep -> none")
+        check(AwakeEngine.assertionProfile(active: true, onlyOnAC: false, onACPower: false, allowDisplaySleep: false) == .screenAndSystem,
+              "profile: no battery rule + battery -> screenAndSystem")
+        check(AwakeEngine.assertionProfile(active: true, onlyOnAC: false, onACPower: false, allowDisplaySleep: true) == .systemOnly,
+              "profile: no battery rule + battery + screen may sleep -> systemOnly")
 
         defaults.removePersistentDomain(forName: suite)
         print(failures == 0 ? "SELFTEST OK" : "SELFTEST FAILED (\(failures))")
