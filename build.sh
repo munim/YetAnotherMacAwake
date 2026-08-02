@@ -29,6 +29,7 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/$APP_NAME"
 cp Info.plist "$APP/Contents/Info.plist"
+cp assets/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 # Stamp version BEFORE codesign (codesign seals Info.plist).
 plutil -replace CFBundleShortVersionString -string "$VERSION" "$APP/Contents/Info.plist"
 plutil -replace CFBundleVersion -string "$VERSION" "$APP/Contents/Info.plist"
