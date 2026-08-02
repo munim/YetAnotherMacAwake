@@ -23,19 +23,25 @@ struct MenuContentView: View {
     @ObservedObject private var state = AppState.shared
 
     var body: some View {
-        Text(state.stateText)
+        HStack(spacing: 6) {
+            Image(systemName: state.menuIconName)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(state.engine.isActive ? Color.green : Color.secondary)
+            Text(state.stateText)
+                .font(.system(size: 12, weight: .medium))
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+        }
+        .padding(.vertical, 2)
 
         Divider()
 
-        Button { state.setMode(.on) } label: {
-            Label("Always On", systemImage: state.store.mode == .on ? "checkmark" : "")
+        HStack(spacing: 8) {
+            modeBox(.on, icon: "flame.fill", title: "Always On", subtitle: "Keep awake")
+            modeBox(.off, icon: "moon.fill", title: "Off", subtitle: "Allow sleep")
+            modeBox(.scheduled, icon: "calendar", title: "Follow Schedule", subtitle: "Per-day windows")
         }
-        Button { state.setMode(.off) } label: {
-            Label("Off", systemImage: state.store.mode == .off ? "checkmark" : "")
-        }
-        Button { state.setMode(.scheduled) } label: {
-            Label("Follow Schedule", systemImage: state.store.mode == .scheduled ? "checkmark" : "")
-        }
+        .padding(.horizontal, 2)
 
         Divider()
 
@@ -44,6 +50,42 @@ struct MenuContentView: View {
         Divider()
 
         Button("Quit Yet Another Mac Awake") { NSApp.terminate(nil) }
+    }
+
+    /// Selectable mode card: icon + title + subtitle, accent-highlighted when active.
+    private func modeBox(_ mode: Mode, icon: String, title: String, subtitle: String) -> some View {
+        let isSelected = state.store.mode == mode
+        return Button {
+            state.setMode(mode)
+        } label: {
+        VStack(spacing: 4) {
+            Image(systemName: isSelected ? "checkmark.circle.fill" : icon)
+                .font(.system(size: isSelected ? 16 : 18, weight: .medium))
+            Text(title)
+                .font(.system(size: 11, weight: .semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+            Text(subtitle)
+                .font(.system(size: 9))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 10)
+        .padding(.horizontal, 4)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(isSelected ? Color.accentColor.opacity(0.12) : Color.gray.opacity(0.05))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .strokeBorder(isSelected ? Color.accentColor : Color.gray.opacity(0.2), lineWidth: isSelected ? 2 : 1)
+        )
+        .foregroundStyle(isSelected ? Color.accentColor : Color.primary)
+        .contentShape(RoundedRectangle(cornerRadius: 8))
+        }
+        .buttonStyle(.plain)
     }
 }
 
