@@ -21,6 +21,7 @@ struct YetAnotherMacAwakeApp: App {
 
 struct MenuContentView: View {
     @ObservedObject private var state = AppState.shared
+    @Environment(\.openSettings) private var openSettings
 
     var body: some View {
         Label(state.stateText, systemImage: state.menuIconName)
@@ -73,7 +74,14 @@ struct MenuContentView: View {
 
         Divider()
 
-        SettingsLink { Text("Settings…") }
+        // Custom button instead of SettingsLink: when the Settings window is
+        // already open (but behind other apps), SettingsLink would not bring it
+        // to the foreground. openSettings() opens the Settings scene and
+        // NSApp.activate brings an already-open window to the front.
+        Button("Settings…") {
+            openSettings()
+            NSApp.activate(ignoringOtherApps: true)
+        }
 
         Divider()
 
