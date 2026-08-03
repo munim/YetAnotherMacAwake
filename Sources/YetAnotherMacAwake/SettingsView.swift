@@ -29,6 +29,10 @@ struct SettingsView: View {
                 .tabItem { Label("About", systemImage: "info.circle") }
         }
         .frame(width: 520, height: 460)
+        .onExitCommand {
+            // Escape closes the Settings window (the key window while focused).
+            NSApp.keyWindow?.close()
+        }
         .onAppear {
             NSApp.activate()
             syncingLaunchAtLogin = true
