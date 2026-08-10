@@ -49,7 +49,7 @@ open YetAnotherMacAwake.app       # run the bundle
 ### Verify (do this after each feature)
 
 ```bash
-./.build/debug/YetAnotherMacAwake --selftest          # schedule logic, exit 0 = pass (48 cases)
+./.build/debug/YetAnotherMacAwake --selftest          # schedule logic, exit 0 = pass (63 cases)
 ./.build/debug/YetAnotherMacAwake --force-on          # activate without UI (for testing)
 ./.build/debug/YetAnotherMacAwake --pulse-now         # fire one pulse, print idle before/after, exit
 pmset -g assertions | grep -i yetanothermacawake      # both display+system assertions; screen-off mode shows only the system assertion
@@ -119,9 +119,12 @@ All keys are string constants in `SettingsKey` (`settings.onlyOnAC`,
 `settings.pulseApps`, `settings.pulseMethod`, `settings.pulseIntervalSeconds`,
 `settings.pulseKey`, `settings.launchAtLogin`, `settings.allowDisplaySleep`,
 `settings.pulseWhenScreenOff`) and
-`ScheduleStore` (`schedule.mode`, `schedule.days`). `ScheduleStore` persists
+`ScheduleStore` (`schedule.mode`, `schedule.days`, `schedule.onExpiresAt`,
+`schedule.onDurationMinutes`). `ScheduleStore` persists
 `[DaySchedule]` (7, Monday=0…Sunday=6) as JSON under `schedule.days`, mode under
-`schedule.mode`. Keep `@AppStorage` defaults and `UserDefaults.register`
+`schedule.mode`, and the Always-On timer (expiry + chosen duration) under
+`schedule.onExpiresAt` / `schedule.onDurationMinutes` — it survives a relaunch
+and reverts mode to `scheduled` on expiry. Keep `@AppStorage` defaults and `UserDefaults.register`
 in `AppDelegate.applicationDidFinishLaunching` in sync — drift between them
 caused a real bug.
 
