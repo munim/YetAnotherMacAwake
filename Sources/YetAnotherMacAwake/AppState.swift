@@ -24,12 +24,18 @@ final class AppState: ObservableObject {
             self?.evaluate()
         }
         // 1 s ticker: drives the live countdown and wakes up the moment a pause
-        // expires instead of waiting for the next 30 s poll.
+        // expires or an Always-On timer runs out, instead of waiting for the 30 s poll.
         Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
-            guard let self, self.isPaused else { return }
+            guard let self else { return }
+            guard self.isPaused || self.hasActiveOnTimer else { return }
             self.now = Date()
             self.evaluate()
         }
+    }
+
+    /// True while an Always-On timer is armed (a finite `.on` session).
+    var hasActiveOnTimer: Bool {
+        store.mode == .on && store.onExpiresAt != nil
     }
 
     /// Recompute engine state from current mode + schedule, honoring an active pause.
@@ -37,6 +43,15 @@ final class AppState: ObservableObject {
         if let until = pausedUntil, until <= Date() {
             pausedUntil = nil
             pausedMinutes = nil
+        }
+        // Always-On timer expiry: move the mode to its target (Follow Schedule)
+        // before computing active state. This also catches a persisted timer that
+        // expired while the app wasn't running (relaunch, crash).
+        if let target = ScheduleStore.onTimerTarget(mode: store.mode, expiresAt: store.onExpiresAt, now: Date()) {
+            store.mode = target
+            store.onExpiresAt = nil
+            store.onDurationMinutes = nil
+            store.save()
         }
         engine.setActive(pausedUntil == nil ? store.activeNow(now: Date()) : false)
         let interval = UserDefaults.standard.integer(forKey: SettingsKey.pulseIntervalSeconds)
@@ -49,6 +64,24 @@ final class AppState: ObservableObject {
 
     func setMode(_ mode: Mode) {
         store.mode = mode
+        // Leaving Always On cancels any pending timer so it can't fire later.
+        if mode != .on {
+            store.clearOnTimer()
+        }
+        store.save()
+        evaluate()
+    }
+
+    /// Arm "Always On" for a finite duration, or indefinitely (nil).
+    /// Persists the chosen duration + expiry so the timer survives a relaunch.
+    func setAlwaysOn(durationMinutes: Int?) {
+        store.mode = .on
+        store.onDurationMinutes = durationMinutes
+        if let minutes = durationMinutes {
+            store.onExpiresAt = Date().addingTimeInterval(TimeInterval(minutes * 60))
+        } else {
+            store.onExpiresAt = nil
+        }
         store.save()
         evaluate()
     }

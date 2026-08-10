@@ -30,7 +30,24 @@ struct MenuContentView: View {
         Divider()
 
         HStack(spacing: 8) {
-            modeBox(.on, icon: "flame.fill", title: "Always On", subtitle: "Keep awake")
+            Menu {
+                ForEach(alwaysOnOptions, id: \.minutes) { option in
+                    Button {
+                        state.setAlwaysOn(durationMinutes: option.minutes)
+                    } label: {
+                        if state.store.onDurationMinutes == option.minutes {
+                            Label(option.label, systemImage: "checkmark")
+                        } else {
+                            Text(option.label)
+                        }
+                    }
+                }
+            } label: {
+                modeCard(isOn: state.store.mode == .on, icon: "flame.fill",
+                         title: "Always On", subtitle: alwaysOnSubtitle())
+            }
+            .menuStyle(.borderlessButton) // no chevron; renders like the sibling cards
+            .fixedSize()
             modeBox(.off, icon: "moon.fill", title: "Off", subtitle: "Allow sleep")
             modeBox(.scheduled, icon: "calendar", title: "Follow Schedule", subtitle: "Per-day windows")
         }
@@ -88,6 +105,26 @@ struct MenuContentView: View {
         Button("Quit Yet Another Mac Awake") { NSApp.terminate(nil) }
     }
 
+    /// "Always On" durations in the card's submenu. nil = indefinitely (current
+    /// behavior); the rest auto-revert to Follow Schedule when the timer expires.
+    private let alwaysOnOptions: [(minutes: Int?, label: String)] = [
+        (nil, "Indefinitely"),
+        (60, "1 hour"),
+        (120, "2 hours"),
+        (240, "4 hours"),
+        (360, "6 hours"),
+        (720, "12 hours"),
+    ]
+
+    /// Always On card subtitle: live countdown when a timer is armed, else the
+    /// static hint. Drives the visible countdown right next to the card.
+    private func alwaysOnSubtitle() -> String {
+        if let text = ScheduleStore.remainingText(until: state.store.onExpiresAt, now: state.now) {
+            return "\(text) left"
+        }
+        return "Keep awake"
+    }
+
     /// Disable durations shown in the menu submenu, in minutes.
     private let pauseOptions: [(minutes: Int, label: String)] = [
         (1, "1 min"),
@@ -127,9 +164,16 @@ struct MenuContentView: View {
         return Button {
             state.setMode(mode)
         } label: {
+            modeCard(isOn: isSelected, icon: icon, title: title, subtitle: subtitle)
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// The visual card shared by the Off/Schedule buttons and the Always On submenu label.
+    private func modeCard(isOn: Bool, icon: String, title: String, subtitle: String) -> some View {
         VStack(spacing: 4) {
-            Image(systemName: isSelected ? "checkmark.circle.fill" : icon)
-                .font(.system(size: isSelected ? 16 : 18, weight: .medium))
+            Image(systemName: isOn ? "checkmark.circle.fill" : icon)
+                .font(.system(size: isOn ? 16 : 18, weight: .medium))
             Text(title)
                 .font(.system(size: 11, weight: .semibold))
                 .lineLimit(1)
@@ -145,16 +189,14 @@ struct MenuContentView: View {
         .padding(.horizontal, 4)
         .background(
             RoundedRectangle(cornerRadius: 8)
-                .fill(isSelected ? Color.accentColor.opacity(0.12) : Color.gray.opacity(0.05))
+                .fill(isOn ? Color.accentColor.opacity(0.12) : Color.gray.opacity(0.05))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 8)
-                .strokeBorder(isSelected ? Color.accentColor : Color.gray.opacity(0.2), lineWidth: isSelected ? 2 : 1)
+                .strokeBorder(isOn ? Color.accentColor : Color.gray.opacity(0.2), lineWidth: isOn ? 2 : 1)
         )
-        .foregroundStyle(isSelected ? Color.accentColor : Color.primary)
+        .foregroundStyle(isOn ? Color.accentColor : Color.primary)
         .contentShape(RoundedRectangle(cornerRadius: 8))
-        }
-        .buttonStyle(.plain)
     }
 }
 
@@ -332,6 +374,48 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
               "persistence: partial selection decodes")
         check(PulseAppsSelection(rawValue: "").apps.isEmpty,
               "persistence: empty string decodes to empty selection")
+
+        // Always-On timer expiry decision (pure seam).
+        check(ScheduleStore.onTimerTarget(mode: .on, expiresAt: Date().addingTimeInterval(-5), now: Date()) == .scheduled,
+              "on-timer: expired Always On reverts to .scheduled")
+        check(ScheduleStore.onTimerTarget(mode: .on, expiresAt: Date().addingTimeInterval(3600), now: Date()) == nil,
+              "on-timer: unexpired keeps running")
+        check(ScheduleStore.onTimerTarget(mode: .off, expiresAt: Date().addingTimeInterval(-5), now: Date()) == nil,
+              "on-timer: non-.on mode never reverts")
+        check(ScheduleStore.onTimerTarget(mode: .on, expiresAt: nil, now: Date()) == nil,
+              "on-timer: infinite Always On never reverts")
+
+        // Always-On countdown formatter (pure seam).
+        check(ScheduleStore.remainingText(until: Date().addingTimeInterval(90 * 60), now: Date()) == "1h 30m",
+              "remaining: 90m -> '1h 30m'")
+        check(ScheduleStore.remainingText(until: Date().addingTimeInterval(45 * 60), now: Date()) == "45m",
+              "remaining: 45m -> '45m'")
+        check(ScheduleStore.remainingText(until: Date().addingTimeInterval(120 * 60), now: Date()) == "2h",
+              "remaining: 120m -> '2h'")
+        check(ScheduleStore.remainingText(until: Date(), now: Date()) == nil,
+              "remaining: exactly-now -> nil (no stale 0m)")
+        check(ScheduleStore.remainingText(until: Date().addingTimeInterval(-10), now: Date()) == nil,
+              "remaining: expired -> nil (no stale 0m)")
+        check(ScheduleStore.remainingText(until: nil, now: Date()) == nil,
+              "remaining: infinite (no timer) -> nil")
+
+        // Status line appends the countdown when an Always-On timer is armed.
+        store.mode = .on
+        store.onDurationMinutes = 90
+        store.onExpiresAt = at10.addingTimeInterval(90 * 60)
+        check(store.stateText(now: at10) == "Awake: On · 1h 30m left",
+              "status: Always On with timer shows countdown")
+
+        // Persistence round-trip for the Always-On timer (two new persisted keys).
+        store.onExpiresAt = at10.addingTimeInterval(2 * 3600)
+        store.save()
+        let timerStore = ScheduleStore(defaults: defaults)
+        check(timerStore.onDurationMinutes == 90, "persist: onDurationMinutes round-trips")
+        check(timerStore.onExpiresAt != nil, "persist: onExpiresAt round-trips")
+        timerStore.clearOnTimer()
+        let clearedStore = ScheduleStore(defaults: defaults)
+        check(clearedStore.onDurationMinutes == nil && clearedStore.onExpiresAt == nil,
+              "persist: clearOnTimer clears both keys")
 
         defaults.removePersistentDomain(forName: suite)
         print(failures == 0 ? "SELFTEST OK" : "SELFTEST FAILED (\(failures))")
