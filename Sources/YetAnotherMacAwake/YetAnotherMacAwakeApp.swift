@@ -125,14 +125,15 @@ struct MenuContentView: View {
         return "Keep awake"
     }
 
-    /// Disable durations shown in the menu submenu, in minutes.
-    private let pauseOptions: [(minutes: Int, label: String)] = [
+    /// Disable durations shown in the menu submenu, in minutes. nil = indefinitely.
+    private let pauseOptions: [(minutes: Int?, label: String)] = [
         (1, "1 min"),
         (5, "5 min"),
         (10, "10 min"),
         (15, "15 min"),
         (30, "30 min"),
         (60, "1 hour"),
+        (nil, "Indefinitely"),
     ]
 
     /// Screen On/Off radio: filled circle + SF Symbol + label. Always enabled
@@ -306,6 +307,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
               "status line suffix: scheduled active + screen off")
         check(AppState.menuStatusText("Disabled · 5:00 left", paused: true, screenOff: true, batteryDrop: true, presencePulsePaused: true) == "Disabled · 5:00 left",
               "pause countdown untouched: screen off + battery + presence flags")
+        check(AppState.menuStatusText("Disabled · indefinitely", paused: true, screenOff: false, batteryDrop: false, presencePulsePaused: false) == "Disabled · indefinitely",
+              "indefinite pause: status text left untouched")
         check(AppState.menuStatusText("Disabled · 5:00 left", paused: true, screenOff: false, batteryDrop: true, presencePulsePaused: false) == "Disabled · 5:00 left",
               "pause countdown untouched: screen on")
         // Battery-drop suffix: awake active + AC rule on + on battery.

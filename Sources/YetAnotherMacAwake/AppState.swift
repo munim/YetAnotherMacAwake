@@ -86,11 +86,15 @@ final class AppState: ObservableObject {
         evaluate()
     }
 
-    /// Temporarily disable the engine for `minutes`, overriding mode/schedule.
-    /// In-memory only: a relaunch clears any active pause.
-    func pause(for minutes: Int) {
+    /// Temporarily disable the engine for `minutes`, or indefinitely (nil),
+    /// overriding mode/schedule. In-memory only: a relaunch clears any pause.
+    func pause(for minutes: Int?) {
         pausedMinutes = minutes
-        pausedUntil = Date().addingTimeInterval(TimeInterval(minutes * 60))
+        if let minutes {
+            pausedUntil = Date().addingTimeInterval(TimeInterval(minutes * 60))
+        } else {
+            pausedUntil = .distantFuture
+        }
         evaluate()
     }
 
@@ -106,6 +110,12 @@ final class AppState: ObservableObject {
         return until > Date()
     }
 
+    /// Paused with no countdown (the "Indefinitely" option). Disambiguates a nil
+    /// `pausedMinutes` between "not paused" and "paused indefinitely".
+    var isIndefinitePause: Bool {
+        isPaused && pausedMinutes == nil
+    }
+
     /// Whole seconds remaining in the pause, rounded up so it never flashes 0:00 early.
     var remainingSeconds: Int {
         guard let until = pausedUntil else { return 0 }
@@ -115,7 +125,7 @@ final class AppState: ObservableObject {
     var stateText: String {
         let paused = isPaused
         let base = paused
-            ? "Disabled · \(Self.mmss(remainingSeconds)) left"
+            ? (isIndefinitePause ? "Disabled · indefinitely" : "Disabled · \(Self.mmss(remainingSeconds)) left")
             : store.stateText(now: now)
         let defaults = UserDefaults.standard
         // Battery-drop: awake active but the AC-only rule drops assertions.
