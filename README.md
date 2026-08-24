@@ -30,6 +30,26 @@
 
 ## Install
 
+**With Homebrew** (via this tap):
+
+```bash
+brew tap munim/yetanothermacawake
+brew trust munim/yetanothermacawake
+brew install --cask yetanothermacawake
+```
+
+`brew trust` is a one-time Homebrew confirmation for third-party taps; without it Homebrew refuses to load the cask.
+
+The app is ad-hoc signed (no Apple Developer ID), so macOS Gatekeeper may block
+it after a quarantined download. If it reports the app as "damaged" or
+unverified, either install with:
+
+```bash
+brew install --cask --no-quarantine yetanothermacawake
+```
+
+or clear quarantine once: `xattr -d com.apple.quarantine /Applications/YetAnotherMacAwake.app`.
+
 **From a release:**
 
 Download the latest universal `.dmg` (or `.zip`) from [Releases](https://github.com/munim/YetAnotherMacAwake/releases), open it, drag **YetAnotherMacAwake.app** to `/Applications`. SHA-256 checksums are published alongside each asset.
