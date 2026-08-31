@@ -139,7 +139,12 @@ final class AwakeEngine {
     /// Power state from the 30 s poll; feeds the status line's battery-drop suffix.
     @Published private(set) var onACPower = true
 
-    private var pulseTimer: Timer?
+    /// GCD, not RunLoop `Timer`: a repeating `scheduledTimer` in this menu-bar
+    /// process stopped firing after multi-day uptime while assertions stayed
+    /// held, so presence went Away with the screen still on. A dedicated queue
+    /// keeps firing even when the main run loop sits in tracking mode.
+    private let pulseQueue = DispatchQueue(label: "net.munim.YetAnotherMacAwake.pulse")
+    private var pulseTimer: DispatchSourceTimer?
     private var pulseIntervalSeconds: TimeInterval = 240
 
     private init() {
@@ -171,10 +176,19 @@ final class AwakeEngine {
     }
 
     private func schedulePulseTimer() {
-        pulseTimer?.invalidate()
-        pulseTimer = Timer.scheduledTimer(withTimeInterval: pulseIntervalSeconds, repeats: true) { [weak self] _ in
-            self?.pulse()
+        pulseTimer?.cancel()
+        pulseTimer = nil
+        let source = DispatchSource.makeTimerSource(queue: pulseQueue)
+        source.schedule(
+            deadline: .now() + pulseIntervalSeconds,
+            repeating: pulseIntervalSeconds,
+            leeway: .seconds(1)
+        )
+        source.setEventHandler { [weak self] in
+            DispatchQueue.main.async { self?.pulse() }
         }
+        source.resume()
+        pulseTimer = source
     }
 
     /// Power state and AC-only rule may change anytime; assertions follow.
