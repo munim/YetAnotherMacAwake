@@ -269,7 +269,7 @@ struct SettingsView: View {
                 .onChange(of: allowDisplaySleep) { _, _ in
                     AppState.shared.evaluate()
                 }
-                Text("Screen and system keeps the display on while awake. System only lets the display sleep on its normal timer while the system keeps running — even with the lid closed; it needs AC power (battery ignores the system assertion).")
+                Text("Screen + System: display stays on. System only: display may sleep, system stays awake — even with lid closed (needs power).")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -400,17 +400,47 @@ struct SettingsView: View {
                     Image(systemName: ax.isTrusted ? "checkmark.seal.fill" : "exclamationmark.triangle.fill")
                         .foregroundStyle(ax.isTrusted ? .green : .orange)
                     Text(ax.isTrusted
-                         ? "Granted — presence pulse can reset Teams/Slack session idle."
+                         ? "Granted — Teams/Slack will stay Available."
                          : "Not granted — Teams reads session idle, which synthetic input cannot reset without this.")
                 }
-                if !ax.isTrusted {
-                    Button("Grant Permission…") {
-                        ax.requestAccess()
+                HStack(spacing: 8) {
+                    if !ax.isTrusted {
+                        Button("Grant Permission…") {
+                            ax.requestAccess()
+                        }
                     }
-                    Text("Opens System Settings > Privacy & Security > Accessibility. Enable Yet Another Mac Awake there, the status updates live.")
+                    Button(ax.isTrusted ? "Check Again" : "Refresh Status") {
+                        ax.recheckNow()
+                    }
+                }
+                Text("Opens System Settings > Privacy & Security > Accessibility. Enable Yet Another Mac Awake there — the status updates within 2 seconds, or press Refresh.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                if !ax.isTrusted {
+                    Label("Rebuilt apps lose the grant: ad-hoc signing creates a new identity each build, so you must re-enable it after every ./build.sh. Quit the old app before testing.", systemImage: "arrow.triangle.2.circlepath")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                } else {
+                    Label("Without it, the screen stays on but Teams/Slack will still show Away.", systemImage: "info.circle")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+            }
+            Section("Diagnostics") {
+                Button("Run Pulse Test (3s)") {
+                    Task {
+                        // Pulse on-demand and report whether session idle reset (proves AX works).
+                        let before = AwakeEngine.sessionIdleSeconds()
+                        AwakeEngine.shared.pulse()
+                        try? await Task.sleep(nanoseconds: 1_500_000_000)
+                        let after = AwakeEngine.sessionIdleSeconds()
+                        NSLog("YetAnotherMacAwake diagnostics: session idle %.1fs -> %.1fs ax=\(ax.isTrusted)", before, after)
+                    }
+                }
+                .help("Fires one keep-awake pulse and logs whether session idle reset — check Console.app for YetAnotherMacAwake.")
+                Text("After granting, use this to verify Teams idle actually resets. Check Console.app (filter YetAnotherMacAwake) or run ./YetAnotherMacAwake.app/Contents/MacOS/YetAnotherMacAwake --pulse-now in Terminal.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)

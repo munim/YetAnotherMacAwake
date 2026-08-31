@@ -33,6 +33,22 @@ cp assets/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 # Stamp version BEFORE codesign (codesign seals Info.plist).
 plutil -replace CFBundleShortVersionString -string "$VERSION" "$APP/Contents/Info.plist"
 plutil -replace CFBundleVersion -string "$VERSION" "$APP/Contents/Info.plist"
-codesign --force --sign - "$APP"
+# Prefer a stable local identity so the Accessibility grant survives rebuilds.
+# Create one once with: ./scripts/create-local-cert.sh  (or use a Developer ID).
+# Try stable local identity first (cert may not appear as "valid" for codesigning but still works).
+STABLE_CN="YetAnotherMacAwake Local"
+if security find-certificate -c "$STABLE_CN" -a -p 2>/dev/null | grep -q "BEGIN CERTIFICATE"; then
+    if codesign --force --sign "$STABLE_CN" --options runtime "$APP" 2>/dev/null; then
+        echo "Signed with stable identity: $STABLE_CN (Accessibility grant survives rebuilds)"
+    else
+        # Fallback: ad-hoc (e.g. keychain locked)
+        codesign --force --sign - "$APP"
+        echo "NOTE: stable cert found but signing failed (keychain locked?) — fell back to ad-hoc. Run: security unlock-keychain ~/Library/Keychains/login.keychain-db"
+    fi
+else
+    codesign --force --sign - "$APP"
+    echo "NOTE: ad-hoc signed — Accessibility grant will be lost on next ./build.sh; re-enable in System Settings > Privacy & Security > Accessibility."
+    echo "      Create a stable cert once: ./scripts/create-local-cert.sh"
+fi
 
 echo "Built $APP ($VERSION, $MODE)"

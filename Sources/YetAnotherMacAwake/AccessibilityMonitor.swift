@@ -25,7 +25,13 @@ final class AccessibilityMonitor: ObservableObject {
         let trusted = AXIsProcessTrusted()
         if trusted != isTrusted {
             isTrusted = trusted
+            NSLog("YetAnotherMacAwake accessibility: isTrusted=\(trusted)")
         }
+    }
+
+    /// Force a re-check after the user toggles in System Settings (poll is 2s but manual is instant).
+    func recheckNow() {
+        refresh()
     }
 
     /// Shows the system prompt and opens the Accessibility pane.
