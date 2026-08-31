@@ -157,11 +157,21 @@ final class AwakeEngine {
 
     var isActive: Bool { active }
 
+    private var didPromptAX = false
+
     func setActive(_ value: Bool) {
         guard value != active else { return }
         active = value
         recheck()
         if value {
+            // New Teams (WebView2/Chromium) reads CGEventSource session idle.
+            // Posted events do not reset that counter without Accessibility —
+            // HIDIdleTime still drops, which is why the screen stays on and
+            // presence still goes Away. Prompt once per process.
+            if !AccessibilityMonitor.shared.isTrusted && !didPromptAX {
+                didPromptAX = true
+                AccessibilityMonitor.shared.requestAccess()
+            }
             pulse()
         }
     }

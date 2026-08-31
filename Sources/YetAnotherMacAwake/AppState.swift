@@ -140,8 +140,10 @@ final class AppState: ObservableObject {
             && PulseAppsSelection.fromDefaults(defaults)
                 .presenceMayGoAway(screenOff: screenOffEnabled,
                                    overrideEnabled: defaults.bool(forKey: SettingsKey.pulseWhenScreenOff))
+        let needsAccessibility = !paused && engine.isActive && !ax.isTrusted
         return Self.menuStatusText(base, paused: paused, screenOff: screenOffEnabled,
-                                   batteryDrop: batteryDrop, presencePulsePaused: presencePulsePaused)
+                                   batteryDrop: batteryDrop, presencePulsePaused: presencePulsePaused,
+                                   needsAccessibility: needsAccessibility)
     }
 
     var menuIconName: String {
@@ -164,15 +166,18 @@ final class AppState: ObservableObject {
 
     /// Pure status-line formatter (menu + CLI self-test seam). Appends the
     /// " · Screen off" suffix, then the battery-drop suffix when the AC-only
-    /// rule drops assertions, then the presence-pulse-paused warning. Pause
+    /// rule drops assertions, then the presence-pulse-paused warning, then the
+    /// Accessibility warning. Pause
     /// countdown text is left untouched so a pause stays unambiguous.
     static func menuStatusText(_ base: String, paused: Bool, screenOff: Bool,
-                               batteryDrop: Bool, presencePulsePaused: Bool) -> String {
+                               batteryDrop: Bool, presencePulsePaused: Bool,
+                               needsAccessibility: Bool = false) -> String {
         if paused { return base }
         var text = base
         if screenOff { text += " · Screen off" }
         if batteryDrop { text += " · On battery — sleep allowed" }
         if presencePulsePaused { text += " · Presence may go Away" }
+        if needsAccessibility { text += " · Grant Accessibility" }
         return text
     }
 

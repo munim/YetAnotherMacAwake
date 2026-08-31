@@ -400,8 +400,8 @@ struct SettingsView: View {
                     Image(systemName: ax.isTrusted ? "checkmark.seal.fill" : "exclamationmark.triangle.fill")
                         .foregroundStyle(ax.isTrusted ? .green : .orange)
                     Text(ax.isTrusted
-                         ? "Granted — Yet Another Mac Awake can send silent keep-awake key events."
-                         : "Not granted — keep-awake falls back to a subtle mouse jiggle.")
+                         ? "Granted — presence pulse can reset Teams/Slack session idle."
+                         : "Not granted — Teams reads session idle, which synthetic input cannot reset without this.")
                 }
                 if !ax.isTrusted {
                     Button("Grant Permission…") {

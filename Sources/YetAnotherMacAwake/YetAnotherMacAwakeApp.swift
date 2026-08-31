@@ -21,6 +21,7 @@ struct YetAnotherMacAwakeApp: App {
 
 struct MenuContentView: View {
     @ObservedObject private var state = AppState.shared
+    @ObservedObject private var ax = AccessibilityMonitor.shared
 
     var body: some View {
         Label(state.stateText, systemImage: state.menuIconName)
@@ -229,7 +230,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let idleBefore = Self.idleSeconds()
             AppState.shared.engine.pulse()
             Thread.sleep(forTimeInterval: 1.5)
-            print("idle-before: \(idleBefore)s  idle-after: \(Self.idleSeconds())s")
+            let idleAfter = Self.idleSeconds()
+            print("session-idle-before: \(idleBefore)s  session-idle-after: \(idleAfter)s  ax=\(AccessibilityMonitor.shared.isTrusted)")
+            if idleBefore > 1 && idleAfter >= idleBefore {
+                print("session idle NOT reset — grant Accessibility (Teams reads this, not HIDIdleTime)")
+            }
             exit(0)
         }
     }
