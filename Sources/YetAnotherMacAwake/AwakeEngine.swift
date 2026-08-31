@@ -290,6 +290,7 @@ final class AwakeEngine {
             NSLog("YetAnotherMacAwake pulse skipped: on battery, sleep allowed")
             return
         }
+        let sessionBefore = Self.sessionIdleSeconds()
         let method = PulseMethod(rawValue: defaults.string(forKey: SettingsKey.pulseMethod) ?? "") ?? .auto
         switch method {
         case .jiggle:
@@ -305,12 +306,22 @@ final class AwakeEngine {
                 }
             } else {
                 jiggleMouse()
-                NSLog("YetAnotherMacAwake pulse: mouse jiggle (grant accessibility for silent key)")
+                NSLog("YetAnotherMacAwake pulse: mouse jiggle (grant accessibility)")
             }
         }
         if screenOff && override {
             NSLog("YetAnotherMacAwake pulse: screen off override")
         }
+        let sessionAfter = Self.sessionIdleSeconds()
+        if sessionBefore > 1 && sessionAfter >= sessionBefore {
+            NSLog("YetAnotherMacAwake pulse: session idle not reset (%.1fs → %.1fs); grant Accessibility", sessionBefore, sessionAfter)
+        }
+    }
+
+    /// Chromium (new Teams) idle: `CGEventSource` combined session, not HIDIdleTime.
+    static func sessionIdleSeconds() -> CFTimeInterval {
+        let any = CGEventType(rawValue: ~0) ?? .mouseMoved
+        return CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: any)
     }
 
     /// Press the configured inert key (F20 by default). No app maps it, so
@@ -323,9 +334,18 @@ final class AwakeEngine {
         return true
     }
 
+    /// HID-system source so the event is associated with session idle, not a
+    /// private source Chromium ignores. Suppression 0 so we don't eat real input.
+    private func hidEventSource() -> CGEventSource? {
+        let source = CGEventSource(stateID: .hidSystemState)
+        source?.localEventsSuppressionInterval = 0
+        return source
+    }
+
     private func press(key: CGKeyCode) {
-        CGEvent(keyboardEventSource: nil, virtualKey: key, keyDown: true)?.post(tap: .cghidEventTap)
-        CGEvent(keyboardEventSource: nil, virtualKey: key, keyDown: false)?.post(tap: .cghidEventTap)
+        let source = hidEventSource()
+        CGEvent(keyboardEventSource: source, virtualKey: key, keyDown: true)?.post(tap: .cghidEventTap)
+        CGEvent(keyboardEventSource: source, virtualKey: key, keyDown: false)?.post(tap: .cghidEventTap)
     }
 
     /// Current cursor position in CG coordinates (origin top-left of primary
@@ -349,7 +369,7 @@ final class AwakeEngine {
 
     private func postMouseMove(to point: CGPoint) {
         CGEvent(
-            mouseEventSource: nil, mouseType: .mouseMoved,
+            mouseEventSource: hidEventSource(), mouseType: .mouseMoved,
             mouseCursorPosition: point, mouseButton: .left
         )?.post(tap: .cghidEventTap)
     }
