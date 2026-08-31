@@ -90,15 +90,18 @@ struct MenuContentView: View {
 
         Divider()
 
-        // Custom button instead of SettingsLink: when the Settings window is
-        // already open (but behind other apps), SettingsLink would not bring it
-        // to the foreground. Opens the Settings scene via the AppKit selector
-        // (rather than the `openSettings` environment key) so it compiles on any
-        // Xcode/SDK — the key requires a macOS 14 SDK and Ci runners may be older.
-        Button("Settings…") {
-            NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-            NSApp.activate(ignoringOtherApps: true)
+        // macOS 26: NSApp.sendAction("showSettingsWindow:") is rejected with
+        // "Please use SettingsLink" fault. Use SettingsLink (macOS 14+) which
+        // works with LSUIElement. The async activate brings an already-open
+        // window front (SettingsLink alone doesn't if window is behind).
+        SettingsLink {
+            Text("Settings…")
         }
+        .simultaneousGesture(TapGesture().onEnded {
+            DispatchQueue.main.async {
+                NSApp.activate(ignoringOtherApps: true)
+            }
+        })
 
         Divider()
 

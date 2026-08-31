@@ -34,7 +34,7 @@ struct SettingsView: View {
             NSApp.keyWindow?.close()
         }
         .onAppear {
-            NSApp.activate()
+            NSApp.activate(ignoringOtherApps: true)
             syncingLaunchAtLogin = true
             launchAtLogin = SMAppService.mainApp.status == .enabled
             syncingLaunchAtLogin = false
